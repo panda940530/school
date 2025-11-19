@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>查詢結果</title>
+  <style>
+    :root{
+      --bg:#fafafa;
+      --card:#ffffff;
+      --text:#333;
+      --muted:#666;
+      --border:#e5e5e5;
+      --primary:#4CAF50;
+      --primary-hover:#43a047;
+      --shadow:0 2px 6px rgba(0,0,0,.08);
+      --radius:8px;
+      --pad:1rem;
+    }
+    *{box-sizing:border-box}
+    body{
+      font-family:"Microsoft JhengHei", ui-sans-serif, system-ui;
+      background:var(--bg);
+      color:var(--text);
+      padding:2rem;
+      margin:0;
+      display:flex;
+      justify-content:center;
+    }
+    .card{
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:var(--pad);
+      max-width:1000px;
+      width:100%;
+    }
+    h2{margin:0 0 .75rem;color:var(--text)}
+    .toolbar{
+      display:flex;
+      align-items:center;
+      gap:.5rem;
+      margin:.5rem 0 1rem;
+      flex-wrap:wrap;
+    }
+    button, .btn{
+      display:inline-block;
+      background:var(--primary);
+      color:#fff;
+      padding:.55rem 1.1rem;
+      border:none;
+      border-radius:6px;
+      cursor:pointer;
+      font-size:1rem;
+      text-decoration:none;
+    }
+    button:hover, .btn:hover{ background:var(--primary-hover); }
+    .link{ color:var(--muted); text-decoration:none; margin-left:.5rem; font-size:.9rem; }
+    .link:hover{ text-decoration:underline; }
+
+    .table-wrap{
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius:6px;
+      max-height:60vh;
+    }
+    table{ width:100%; border-collapse:collapse; min-width:640px; background:#fff; }
+    th, td{ padding:.6rem .75rem; border-bottom:1px solid var(--border); vertical-align:top; font-size:.92rem; }
+    th{ background:#f7f7f7; text-align:left; position:sticky; top:0; z-index:1; }
+    tr:nth-child(even) td{ background:#fcfcfc; }
+    .count{ margin-top:.75rem; color:var(--muted); }
+
+    .query-block{ margin-bottom:.75rem; padding:.5rem .75rem; background:#f7f7f7; border-radius:6px; font-size:.9rem; }
+    .query-label{ font-weight:600; margin-bottom:.25rem; color:var(--muted); }
+    .query-text{ white-space:pre-wrap; }
+
+    /* ===== 圖表區（固定大小） ===== */
+    .chart-card{
+      margin: 1rem 0 1.2rem;
+      padding: .75rem;
+      border:1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .chart-title{ font-weight:600; margin:.25rem 0 .5rem; }
+    .chart-note{ color:var(--muted); font-size:.9rem; margin-top:.25rem; }
+    .chart-box{
+      position: relative;
+      width: 100%;
+      height: 420px;      /* 固定高度 */
+      max-height: 420px;
+    }
+    .chart-box canvas{
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+
+    .ai-answer{ margin-top:1.2rem; padding-top:1rem; border-top:1px solid var(--border); }
+    .ai-answer h3{ margin:.1rem 0 .5rem; font-size:1.05rem; }
+    .ai-answer-content{ white-space:pre-wrap; font-size:.95rem; line-height:1.6; }
+  </style>
+
+  <!-- Chart.js 與資料標籤外掛 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+</head>
+<body>
+  <div class="card">
+    <h2>查詢結果</h2>
+
+    {% if question %}
+      <div class="query-block">
+        <div class="query-label">原始查詢：</div>
+        <div class="query-text">{{ question }}</div>
+      </div>
+    {% endif %}
+
+    {# ====== 1) 表格 ====== #}
+    {% if rows and rows|length > 0 %}
+      {% set all_cols = [] %}
+      {% for r in rows %}
+        {% for k in r.keys() %}
+          {% if k not in all_cols %}{% set _ = all_cols.append(k) %}{% endif %}
+        {% endfor %}
+      {% endfor %}
+
+      <div class="toolbar">
+        <form id="csvForm" method="post" action="/download_csv" style="display:inline;">
+          <input type="hidden" name="rows" id="rowsInput">
+          <button type="submit">下載 CSV（UTF-8）</button>
+        </form>
+        <a class="link" href="/">← 回查詢頁</a>
+      </div>
+
+      <div class="table-wrap">
+        <table id="tbl">
+          <thead>
+            <tr>
+              {% for c in all_cols %}
+                <th>{{ c }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              <tr>
+                {% for c in all_cols %}
+                  <td>{{ r.get(c, "") }}</td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="count">共 {{ rows|length }} 筆。</div>
+
+      <script>
+        const rowsDataForCsv = {{ rows | tojson | safe }};
+        document.getElementById('rowsInput').value = JSON.stringify(rowsDataForCsv);
+      </script>
+    {% else %}
+      <p class="muted">沒有資料（請確認 n8n 的 Respond to Webhook 有回傳 rows 陣列）。</p>
+      <a class="link" href="/">← 回查詢頁</a>
+    {% endif %}
+
+    {# ====== 2) 圖表（固定大小；表格之後、AI 回應之前） ====== #}
+    {% if chart and rows_raw and rows_raw|length > 0 %}
+      <div class="chart-card">
+        <div class="chart-title">{{ chart.title or '統計圖表' }}</div>
+        <div class="chart-box">
+          <canvas id="mixedChart"></canvas>
+        </div>
+        {% if chart.note %}
+          <div class="chart-note">{{ chart.note }}</div>
+        {% endif %}
+      </div>
+
+      <script>
+        // 後端資料
+        const chartSpec = {{ chart | tojson | safe }};
+        const rowsRaw   = {{ rows_raw | tojson | safe }}; //rows_raw 為未格式化的原始資料
+
+        // 只使用 x_field + y_field 前兩個當柱狀（件數、 人數）+ 最後一個當折線（金額）
+        const xKey   = chartSpec.x_field;
+        const yKeys  = chartSpec.y_field || [];
+        const labels = rowsRaw.map(r => r[xKey]);
+
+        const fmtComma = v => { try { return Number(v).toLocaleString(); } catch(e){ return v; } };
+
+        const ds = [];
+
+        // 件數（橘）— yKeys[0]
+        if (yKeys.length >= 1) {
+          ds.push({
+            type: 'bar',
+            label: yKeys[0],                                     // ex: project_count
+            data: rowsRaw.map(r => Number(r[yKeys[0]]) || 0),
+            yAxisID: 'y1',
+            backgroundColor: '#f57c00',
+            borderRadius: 6,
+            maxBarThickness: 48,
+            datalabels: {
+              anchor: 'end', align: 'start', offset: 2,
+              color: '#6b7280', font: { weight: '700' },
+              formatter: v => v
+            }
+          });
+        }
+
+        // 人數（綠）— yKeys[1]
+        if (yKeys.length >= 2) {
+          ds.push({
+            type: 'bar',
+            label: yKeys[1],                                     // ex: pi_count
+            data: rowsRaw.map(r => Number(r[yKeys[1]]) || 0),
+            yAxisID: 'y1',
+            backgroundColor: '#2e7d32',
+            borderRadius: 6,
+            maxBarThickness: 48,
+            datalabels: {
+              anchor: 'end', align: 'start', offset: 2,
+              color: '#6b7280', font: { weight: '700' },
+              formatter: v => v
+            }
+          });
+        }
+
+        // 金額（黃折線）— 使用最後一個 yKey（方便之後擴充）
+        if (yKeys.length >= 1) {
+          const moneyKey = yKeys[yKeys.length - 1];             // ex: total_approved_amount
+          ds.push({
+            type: 'line',
+            label: moneyKey,
+            data: rowsRaw.map(r => Number(r[moneyKey]) || 0),
+            yAxisID: 'y2',
+            borderColor: '#fdd835',
+            backgroundColor: '#fdd835',
+            borderWidth: 3,
+            tension: 0.3,
+            pointRadius: 4,
+            datalabels: {
+              anchor: 'end', align: 'top', offset: 6,
+              color: '#6b7280', font: { weight: '700' },
+              formatter: v => fmtComma(v)
+            }
+          });
+        }
+
+        // 註冊 datalabels（避免重覆）
+        if (!Chart.registry.plugins.get('datalabels')) {
+          Chart.register(ChartDataLabels);
+        }
+        if (window.__mixedChart) window.__mixedChart.destroy();
+
+        const ctx = document.getElementById('mixedChart');
+        window.__mixedChart = new Chart(ctx, {
+          data: { labels, datasets: ds },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,  // 高度由 .chart-box 控制
+            resizeDelay: 120,
+            plugins: {
+              legend: { position: 'bottom' },
+              title: { display: !!chartSpec.title, text: chartSpec.title || '' },
+              tooltip: {
+                mode: 'index', intersect: false,
+                callbacks: {
+                  label: (c) => {
+                    const val = c.parsed.y;
+                    const isMoney = c.dataset.yAxisID === 'y2';
+                    return `${c.dataset.label}: ${isMoney ? fmtComma(val) : val}`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { grid: { display: false } },
+              y1: {
+                type: 'linear', position: 'left', beginAtZero: true,
+                title: { display: true, text: '件數 / 人數' }
+              },
+              y2: {
+                type: 'linear', position: 'right', beginAtZero: true,
+                grid: { drawOnChartArea: false },
+                ticks: { callback: (v) => fmtComma(v) },
+                title: { display: true, text: '金額（元）' }
+              }
+            }
+          }
+        });
+      </script>
+    {% endif %}
+
+    {# ====== 3) AI 回應 ====== #}
+    {% if answer %}
+      <div class="ai-answer">
+        <h3>AI 回應</h3>
+        <div class="ai-answer-content">{{ answer }}</div>
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>

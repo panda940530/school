@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>校務查詢助手</title>
+  <style>
+    :root{
+      --bg:#fafafa;
+      --card:#ffffff;
+      --text:#333;
+      --muted:#666;
+      --border:#e5e5e5;
+      --primary:#4CAF50;
+      --primary-hover:#43a047;
+      --shadow:0 2px 8px rgba(0,0,0,.08);
+      --radius:10px;
+    }
+    *{box-sizing:border-box;}
+    body{
+      font-family:"Microsoft JhengHei", ui-sans-serif, system-ui;
+      background:var(--bg);
+      margin:0;
+      padding:2rem;
+      display:flex;
+      justify-content:center;
+    }
+    .container{
+      max-width:780px;
+      width:100%;
+    }
+    h1{
+      margin:0 0 .5rem;
+      color:var(--text);
+      font-size:1.6rem;
+    }
+    p.subtitle{
+      margin:.1rem 0 1.5rem;
+      color:var(--muted);
+      font-size:.95rem;
+    }
+    .card{
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:1.25rem 1.5rem 1.5rem;
+    }
+    label{
+      display:block;
+      font-weight:600;
+      margin-bottom:.4rem;
+      color:var(--text);
+    }
+    textarea{
+      width:100%;
+      min-height:120px;
+      resize:vertical;
+      padding:.7rem .8rem;
+      border-radius:8px;
+      border:1px solid var(--border);
+      font-family:inherit;
+      font-size:.98rem;
+      line-height:1.5;
+    }
+    textarea:focus{
+      outline:none;
+      border-color:var(--primary);
+      box-shadow:0 0 0 2px rgba(76,175,80,.15);
+    }
+    .hint{
+      margin-top:.4rem;
+      color:var(--muted);
+      font-size:.85rem;
+      line-height:1.4;
+    }
+    .examples{
+      margin-top:.6rem;
+      padding:.6rem .8rem;
+      background:#f7f7f7;
+      border-radius:8px;
+      font-size:.85rem;
+      color:var(--muted);
+    }
+    .examples div{
+      margin-top:.1rem;
+    }
+    button{
+      margin-top:1rem;
+      background:var(--primary);
+      color:#fff;
+      border:none;
+      border-radius:8px;
+      padding:.6rem 1.4rem;
+      cursor:pointer;
+      font-size:1rem;
+    }
+    button:hover{
+      background:var(--primary-hover);
+    }
+    .n8n-info{
+      margin-top:1rem;
+      font-size:.8rem;
+      color:var(--muted);
+    }
+    code{
+      background:#f3f3f3;
+      padding:2px 6px;
+      border-radius:4px;
+      word-break:break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>校務查詢助手</h1>
+    <p class="subtitle">輸入自然語言問題，由 n8n 連接資料庫查詢並產生 AI 回應。</p>
+
+    <div class="card">
+      <form method="post">
+        <label for="query">請輸入查詢內容（自然語言）</label>
+        <textarea id="query" name="query" placeholder="例如：&#10;・列出各核定年度的經費總額與件數&#10;・幫我整理某學院最近三年的計畫數量與總金額" required></textarea>
+        <div class="hint">送出後，Flask 會把這段文字傳給 n8n Webhook，n8n 執行 SQL / 查詢，再把表格與 AI 說明回傳。</div>
+        <div class="examples">
+          <strong>範例：</strong>
+          <div>「核定每年的經費總額、總數」</div>
+          <div>「統計目前執行中的計畫件數與總金額」</div>
+        </div>
+        <button type="submit">送出查詢</button>
+      </form>
+      <div class="n8n-info">
+        n8n Webhook URL：<code>{{ n8n_url }}</code>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
