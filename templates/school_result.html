@@ -172,7 +172,6 @@
           <canvas id="mixedChart"></canvas>
         </div>
       </div>
-
       <script>
         // 後端資料
         const chartSpec = {{ chart | tojson | safe }};
@@ -281,9 +280,7 @@
             yAxisID: 'y1',
             backgroundColor: barColors[idx % barColors.length],
             borderRadius: 6,
-            maxBarThickness: 36,
-            barPercentage: 0.7,
-            categoryPercentage: 0.6,
+            maxBarThickness: 48,
             order: 99,                      // ★ 折線一定畫在長條之後（上層）
             datalabels: {
               anchor: 'end',
@@ -353,12 +350,6 @@
               x: {
                 grid: { display: false },
                 title: { display: !!xAxisLabel, text: xAxisLabel },
-                ticks: {
-                  autoSkip: true,
-                  autoSkipPadding: 12,
-                  maxRotation: 45,
-                  minRotation: 0
-                }
               },
               y1: {
                 type: 'linear',
