@@ -34,7 +34,7 @@
       max-width:1000px;
       width:100%;
     }
-    h2{margin:0 0 .75rem;color:var(--text)}
+    h2{margin:0 0 .75rem;color:var(--text);text-align: center;}
     .toolbar{
       display:flex;
       align-items:center;
@@ -81,7 +81,7 @@
       border-radius: 8px;
       background: #fff;
     }
-    .chart-title{ font-weight:600; margin:.25rem 0 .5rem; }
+    .chart-title{ font-weight:600; margin:.25rem 0 .5rem;text-align:center;width:100%;}
     .chart-note{ color:var(--muted); font-size:.9rem; margin-top:.25rem; }
     .chart-box{
       position: relative;
@@ -156,7 +156,7 @@
       <div class="count">共 {{ rows|length }} 筆。</div>
 
       <script>
-        const rowsDataForCsv = {{ rows | tojson | safe }};
+        rowsDataForCsv = {{ rows | tojson | safe }};
         document.getElementById('rowsInput').value = JSON.stringify(rowsDataForCsv);
       </script>
     {% else %}
@@ -165,73 +165,142 @@
     {% endif %}
 
     {# ====== 2) 圖表（固定大小；表格之後、AI 回應之前） ====== #}
-    {% if chart and rows_raw and rows_raw|length > 0 %}
+    {% if chart and chart.chart_enable and rows_raw and rows_raw|length > 0 %}
       <div class="chart-card">
         <div class="chart-title">{{ chart.title or '統計圖表' }}</div>
         <div class="chart-box">
           <canvas id="mixedChart"></canvas>
         </div>
-        {% if chart.note %}
-          <div class="chart-note">{{ chart.note }}</div>
-        {% endif %}
       </div>
 
       <script>
         // 後端資料
         const chartSpec = {{ chart | tojson | safe }};
-        const rowsRaw   = {{ rows_raw | tojson | safe }}; //rows_raw 為未格式化的原始資料
+        const rowsRaw   = {{ rows_raw | tojson | safe }};
+        const colMap    = {{ col_map | tojson | safe }};  // 英文欄名 → 中文欄名
 
-        // 只使用 x_field + y_field 前兩個當柱狀（件數、 人數）+ 最後一個當折線（金額）
-        const xKey   = chartSpec.x_field;
-        const yKeys  = chartSpec.y_field || [];
-        const labels = rowsRaw.map(r => r[xKey]);
+        // 直接用欄位英文 key 查中文名
+        const fieldLabel = (key) => colMap[key] || key;
 
-        const fmtComma = v => { try { return Number(v).toLocaleString(); } catch(e){ return v; } };
+        const toArray = (v) => Array.isArray(v) ? v : (v != null && v !== "" ? [v] : []);
+
+        // x 軸支援單欄或多欄（陣列）
+        const xKeysRaw = toArray(chartSpec.x_field).map(String);
+        let   xUnits   = toArray(chartSpec.x_field_unit).map(String);
+        if (xUnits.length < xKeysRaw.length) {
+          xUnits = [...xUnits, ...Array(xKeysRaw.length - xUnits.length).fill("")];
+        } else if (xUnits.length > xKeysRaw.length) {
+          xUnits = xUnits.slice(0, xKeysRaw.length);
+        }
+        const xKeys = xKeysRaw;
+
+        const yKeys = Array.isArray(chartSpec.y_field)
+          ? chartSpec.y_field
+          : (chartSpec.y_field ? [chartSpec.y_field] : []);
+
+        // label 為多個 x 欄位值組合，確保顯示「年度 - 類別」等
+        const labels = rowsRaw.map((r, idx) => {
+          if (!xKeys.length) return `項目${idx + 1}`;
+          const parts = xKeys.map((k, i) => {
+            const val = r[k];
+            const unit = xUnits[i] || "";
+            if (val === undefined || val === null) return "";
+            return unit ? `${val}${unit}` : `${val}`;
+          }).filter(Boolean);
+          return parts.join(" - ") || `項目${idx + 1}`;
+        });
+        const xAxisLabel = xUnits.filter(Boolean).join(" / ");
+
+        // y_field_unit 對齊長度
+        const rawUnits = chartSpec.y_field_unit ?? [];
+        let yUnits = Array.isArray(rawUnits) ? rawUnits : [rawUnits];
+        if (yUnits.length < yKeys.length) {
+          yUnits = [...yUnits, ...Array(yKeys.length - yUnits.length).fill("")];
+        } else if (yUnits.length > yKeys.length) {
+          yUnits = yUnits.slice(0, yKeys.length);
+        }
+
+        const fmtComma = v => {
+          try { return Number(v).toLocaleString(); }
+          catch(e){ return v; }
+        };
+
+        // 偵測哪一個欄位是「金額」
+        function detectMoneyKey(keys, units) {
+          const moneyHints = ['元','金額','金钱','金錢','dollar','dollars','usd','ntd','amount'];
+          for (let i = 0; i < keys.length; i++) {
+            const keyStr  = String(keys[i]  ?? '').toLowerCase();
+            const unitStr = String(units[i] ?? '').toLowerCase();
+            if (moneyHints.some(h => unitStr.includes(h))) return keys[i];
+            if (moneyHints.some(h => keyStr.includes(h)))  return keys[i];
+          }
+          if ((chartSpec.chart_type || '').toLowerCase().includes('dual') && keys.length > 0) {
+            return keys[keys.length - 1];
+          }
+          return null;
+        }
+
+        const moneyKey = detectMoneyKey(yKeys, yUnits);
+
+        // === 根據 moneyKey，把欄位分成左軸 / 右軸 ===
+        const leftKeys = [];
+        let   rightKey = moneyKey || null;
+
+        yKeys.forEach((k, idx) => {
+          if (!k) return;
+          if (rightKey && k === rightKey) return;  // 金額欄位給右軸
+          leftKeys.push({ key: k, unit: yUnits[idx] || "" });
+        });
+
+        // 左軸顯示：件數 / 人數（件、人）
+        // === 左軸（件、人…非金額） ===
+        const leftUnits = [...new Set(leftKeys.map(it => it.unit).filter(Boolean))];
+        // 左軸單位（例如：件 / 人）
+        const y1Label = leftUnits.length ? leftUnits.join(" / ") : "";
+
+        // === 右軸（金額） ===
+        let y2Label = "";
+        if (rightKey) {
+          const idx = yKeys.indexOf(rightKey);
+          const unit = idx >= 0 ? (yUnits[idx] || "") : "";
+          y2Label = unit;  // ★ 只顯示「新台幣 (元)」
+        }
 
         const ds = [];
+        const barColors = ['#f57c00', '#2e7d32', '#1976d2'];  // 橘 / 綠 / 藍
 
-        // 件數（橘）— yKeys[0]
-        if (yKeys.length >= 1) {
+        // 1) 非金額欄 → 柱狀圖
+        yKeys.forEach((key, idx) => {
+          if (!key) return;
+          if (moneyKey && key === moneyKey) return;  // 金額留給折線
+
           ds.push({
             type: 'bar',
-            label: yKeys[0],                                     // ex: project_count
-            data: rowsRaw.map(r => Number(r[yKeys[0]]) || 0),
+            label: fieldLabel(key),   // ★ 直接用 col_map 取中文
+            data: rowsRaw.map(r => Number(r[key]) || 0),
             yAxisID: 'y1',
-            backgroundColor: '#f57c00',
+            backgroundColor: barColors[idx % barColors.length],
             borderRadius: 6,
-            maxBarThickness: 48,
+            maxBarThickness: 36,
+            barPercentage: 0.7,
+            categoryPercentage: 0.6,
+            order: 99,                      // ★ 折線一定畫在長條之後（上層）
             datalabels: {
-              anchor: 'end', align: 'start', offset: 2,
-              color: '#6b7280', font: { weight: '700' },
+              anchor: 'end',
+              align: 'start',
+              offset: 2,
+              color: '#6b7280',
+              font: { weight: '700' },
               formatter: v => v
             }
           });
-        }
+        });
 
-        // 人數（綠）— yKeys[1]
-        if (yKeys.length >= 2) {
-          ds.push({
-            type: 'bar',
-            label: yKeys[1],                                     // ex: pi_count
-            data: rowsRaw.map(r => Number(r[yKeys[1]]) || 0),
-            yAxisID: 'y1',
-            backgroundColor: '#2e7d32',
-            borderRadius: 6,
-            maxBarThickness: 48,
-            datalabels: {
-              anchor: 'end', align: 'start', offset: 2,
-              color: '#6b7280', font: { weight: '700' },
-              formatter: v => v
-            }
-          });
-        }
-
-        // 金額（黃折線）— 使用最後一個 yKey（方便之後擴充）
-        if (yKeys.length >= 1) {
-          const moneyKey = yKeys[yKeys.length - 1];             // ex: total_approved_amount
+        // 2) 金額欄 → 黃色折線
+        if (moneyKey) {
           ds.push({
             type: 'line',
-            label: moneyKey,
+            label: fieldLabel(moneyKey),   // ★ 這裡也用中文欄名
             data: rowsRaw.map(r => Number(r[moneyKey]) || 0),
             yAxisID: 'y2',
             borderColor: '#fdd835',
@@ -239,9 +308,14 @@
             borderWidth: 3,
             tension: 0.3,
             pointRadius: 4,
+            // ★★★ 讓折線永遠畫在最頂層 ★★★
+            order: 1,
             datalabels: {
-              anchor: 'end', align: 'top', offset: 6,
-              color: '#6b7280', font: { weight: '700' },
+              anchor: 'end',
+              align: 'top',
+              offset: 6,
+              color: '#fdd835',
+              font: { weight: '700' },
               formatter: v => fmtComma(v)
             }
           });
@@ -258,13 +332,14 @@
           data: { labels, datasets: ds },
           options: {
             responsive: true,
-            maintainAspectRatio: false,  // 高度由 .chart-box 控制
+            maintainAspectRatio: false,
             resizeDelay: 120,
             plugins: {
               legend: { position: 'bottom' },
-              title: { display: !!chartSpec.title, text: chartSpec.title || '' },
+              title: { display: false  },
               tooltip: {
-                mode: 'index', intersect: false,
+                mode: 'index',
+                intersect: false,
                 callbacks: {
                   label: (c) => {
                     const val = c.parsed.y;
@@ -275,16 +350,29 @@
               }
             },
             scales: {
-              x: { grid: { display: false } },
+              x: {
+                grid: { display: false },
+                title: { display: !!xAxisLabel, text: xAxisLabel },
+                ticks: {
+                  autoSkip: true,
+                  autoSkipPadding: 12,
+                  maxRotation: 45,
+                  minRotation: 0
+                }
+              },
               y1: {
-                type: 'linear', position: 'left', beginAtZero: true,
-                title: { display: true, text: '件數 / 人數' }
+                type: 'linear',
+                position: 'left',
+                beginAtZero: true,
+                title: { display: !!y1Label, text: y1Label }
               },
               y2: {
-                type: 'linear', position: 'right', beginAtZero: true,
+                type: 'linear',
+                position: 'right',
+                beginAtZero: true,
                 grid: { drawOnChartArea: false },
                 ticks: { callback: (v) => fmtComma(v) },
-                title: { display: true, text: '金額（元）' }
+                title: { display: !!y2Label, text: y2Label }
               }
             }
           }

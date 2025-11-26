@@ -2,7 +2,7 @@ import os, requests
 from flask import Flask, request, render_template, make_response
 
 USE_TEST = 1   # 1是測試用的Test URL, 0是正式用的Production URL
-BASE     = os.getenv("N8N_BASE", "http://127.0.0.1:5678")  # n8n的主機位置
+BASE     = os.getenv("N8N_BASE", "http://n8n:5679")  # n8n的主機位置 容器內:http://n8n:5679 外部: http://localhost:5679
 PATH     = "/webhook-test/school" if USE_TEST else "/webhook/school"  # 測試跟正式用的不同URL路徑
 N8N_WEBHOOK = f"{BASE}{PATH}"  # 兩者拼起來的完整 URL
 
@@ -153,6 +153,7 @@ def upload():
         rows=localized_rows,          # 中文表格
         rows_raw=rows_raw_for_chart,  # 給圖表用
         chart=chart_spec,             # n8n的 chart 規格
+        col_map=col_map,              # ★ 新增：欄位英文→中文對照
         answer=answer,
         question=query_text
     )
@@ -185,4 +186,4 @@ def download_csv():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(host="0.0.0.0", port=5000)
