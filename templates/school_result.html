@@ -266,7 +266,7 @@
         }
 
         const ds = [];
-        const barColors = ['#f57c00', '#2e7d32', '#1976d2'];  // 橘 / 綠 / 藍
+        const barColors = {{ (bar_colors or ['#f57c00', '#2e7d32', '#1976d2', '#7b1fa2']) | tojson | safe }};
 
         // 1) 非金額欄 → 柱狀圖
         yKeys.forEach((key, idx) => {
@@ -281,7 +281,7 @@
             backgroundColor: barColors[idx % barColors.length],
             borderRadius: 6,
             maxBarThickness: 48,
-            order: 99,                      // ★ 折線一定畫在長條之後（上層）
+            order: 99,                    // ★ 折線一定畫在長條之後（上層）  
             datalabels: {
               anchor: 'end',
               align: 'start',
@@ -290,30 +290,31 @@
               font: { weight: '700' },
               formatter: v => v
             }
-          });
+          });  
         });
 
         // 2) 金額欄 → 黃色折線
         if (moneyKey) {
+          const moneyIdx = Math.max(yKeys.indexOf(moneyKey), 0);
+          const moneyColor = barColors[moneyIdx % barColors.length] || '#fdd835';
           ds.push({
             type: 'line',
             label: fieldLabel(moneyKey),   // ★ 這裡也用中文欄名
             data: rowsRaw.map(r => Number(r[moneyKey]) || 0),
             yAxisID: 'y2',
-            borderColor: '#fdd835',
-            backgroundColor: '#fdd835',
+            borderColor: moneyColor,
+            backgroundColor: moneyColor,
             borderWidth: 3,
             tension: 0.3,
             pointRadius: 4,
-            // ★★★ 讓折線永遠畫在最頂層 ★★★
-            order: 1,
-            datalabels: {
+            order: 1,           // ★★★ 讓折線永遠畫在最頂層 ★★★
+            datalabels: { 
               anchor: 'end',
               align: 'top',
-              offset: 6,
-              color: '#fdd835',
-              font: { weight: '700' },
-              formatter: v => fmtComma(v)
+              offset: 6, 
+              color: moneyColor, 
+              font: { weight: '700' }, 
+              formatter: v => fmtComma(v) 
             }
           });
         }

@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>校務查詢助手</title>
+  <title>計畫查詢入口</title>
   <style>
     :root{
       --bg:#fafafa;
@@ -66,6 +66,36 @@
       border-color:var(--primary);
       box-shadow:0 0 0 2px rgba(76,175,80,.15);
     }
+    .color-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+      gap:.75rem;
+      margin-top:1rem;
+    }
+    .color-field{
+      display:flex;
+      align-items:center;
+      gap:.4rem;
+      padding:.55rem .65rem;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:#fafafa;
+    }
+    .color-field label{
+      margin:0;
+      font-weight:500;
+      font-size:.9rem;
+      min-width:64px;
+      color:var(--muted);
+    }
+    .color-field input[type="color"]{
+      width:44px;
+      height:32px;
+      padding:0;
+      border:none;
+      background:transparent;
+      cursor:pointer;
+    }
     .hint{
       margin-top:.4rem;
       color:var(--muted);
@@ -111,18 +141,37 @@
 </head>
 <body>
   <div class="container">
-    <h1>校務查詢助手</h1>
-    <p class="subtitle">輸入自然語言問題，由 n8n 連接資料庫查詢並產生 AI 回應。</p>
+    <h1>計畫查詢入口</h1>
+    <p class="subtitle">輸入自然語言需求，由 n8n 連到資料庫查詢並回傳 AI 解說。</p>
 
     <div class="card">
       <form method="post">
         <label for="query">請輸入查詢內容（自然語言）</label>
-        <textarea id="query" name="query" placeholder="例如：&#10;・列出各核定年度的經費總額與件數&#10;・幫我整理某學院最近三年的計畫數量與總金額" required></textarea>
-        <div class="hint">送出後，Flask 會把這段文字傳給 n8n Webhook，n8n 執行 SQL / 查詢，再把表格與 AI 說明回傳。</div>
+        <textarea id="query" name="query" placeholder="例如：&#10;請彙整近三年度核定金額與件數&#10;請幫我整理各學院近五年計畫件數的總趨勢" required></textarea>
+        <div class="hint">送出後由 Flask 轉送到 n8n Webhook，n8n 會跑 SQL / 查詢，結果表格與 AI 說明會呈現。</div>
         <div class="examples">
-          <strong>範例：</strong>
-          <div>「核定每年的經費總額、總數」</div>
-          <div>「統計目前執行中的計畫件數與總金額」</div>
+          <strong>範例</strong>
+          <div>請統計近三年度核定金額與總件數</div>
+          <div>請統計目前執行中計畫件數與總金額</div>
+        </div>
+        {% set colors = default_bar_colors or ['#f57c00','#2e7d32','#1976d2','#7b1fa2'] %}
+        <div class="color-grid">
+          <div class="color-field">
+            <label for="color1">顏色 1</label>
+            <input type="color" id="color1" name="color1" value="{{ colors[0] }}">
+          </div>
+          <div class="color-field">
+            <label for="color2">顏色 2</label>
+            <input type="color" id="color2" name="color2" value="{{ colors[1] }}">
+          </div>
+          <div class="color-field">
+            <label for="color3">顏色 3</label>
+            <input type="color" id="color3" name="color3" value="{{ colors[2] }}">
+          </div>
+          <div class="color-field">
+            <label for="color4">顏色 4</label>
+            <input type="color" id="color4" name="color4" value="{{ colors[3] }}">
+          </div>
         </div>
         <button type="submit">送出查詢</button>
       </form>
