@@ -100,7 +100,7 @@
       display:flex;
       align-items:center;
       gap:.5rem;
-      margin-top:.75rem;
+      margin-top:.2rem;
     }
     .voice-status{
       color:var(--muted);
@@ -157,18 +157,14 @@
     <div class="card">
       <form method="post">
         <label for="query">請輸入查詢內容（自然語言）</label>
-        <textarea id="query" name="query" placeholder="例如：&#10;請彙整近三年度核定金額與件數&#10;請幫我整理各學院近五年計畫件數的總趨勢" required></textarea>
+        <textarea id="query" name="query" placeholder="例如：&#10;請做出本校111~114年度不同單位類別承接計畫件數、人數、金額之統計圖&#10;請計算各學院於 114 年度執行計畫之教師比例及人均值" required></textarea>
         <div class="hint">送出後由 Flask 轉送到 n8n Webhook，n8n 會跑 SQL / 查詢，結果表格與 AI 說明會呈現。</div>
-        <div class="examples">
-          <strong>範例</strong>
-          <div>請統計近三年度核定金額與總件數</div>
-          <div>請統計目前執行中計畫件數與總金額</div>
-        </div>
         <div class="voice-row">
-          <button type="button" id="voiceBtn" style="background:#ff9800;">🎤 語音輸入</button>
+          <button type="button" id="voiceBtn" style="background:#ff9800;">語音輸入</button>
           <span id="voiceStatus" class="voice-status"></span>
         </div>
         {% set colors = default_bar_colors or ['#f57c00','#2e7d32','#1976d2','#7b1fa2'] %}
+        <div class="hint">需要統計圖就在輸入問題輸入統計圖，顏色是按照你問的內容的順序的。</div>
         <div class="color-grid">
           <div class="color-field">
             <label for="color1">顏色 1</label>
