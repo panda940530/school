@@ -96,6 +96,16 @@
       background:transparent;
       cursor:pointer;
     }
+    .voice-row{
+      display:flex;
+      align-items:center;
+      gap:.5rem;
+      margin-top:.75rem;
+    }
+    .voice-status{
+      color:var(--muted);
+      font-size:.9rem;
+    }
     .hint{
       margin-top:.4rem;
       color:var(--muted);
@@ -154,6 +164,10 @@
           <div>請統計近三年度核定金額與總件數</div>
           <div>請統計目前執行中計畫件數與總金額</div>
         </div>
+        <div class="voice-row">
+          <button type="button" id="voiceBtn" style="background:#ff9800;">🎤 語音輸入</button>
+          <span id="voiceStatus" class="voice-status"></span>
+        </div>
         {% set colors = default_bar_colors or ['#f57c00','#2e7d32','#1976d2','#7b1fa2'] %}
         <div class="color-grid">
           <div class="color-field">
@@ -181,4 +195,52 @@
     </div>
   </div>
 </body>
+<script>
+  (() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const btn = document.getElementById('voiceBtn');
+    const statusEl = document.getElementById('voiceStatus');
+    const textarea = document.getElementById('query');
+
+    if (!SpeechRecognition) {
+      if (btn) btn.disabled = true;
+      if (statusEl) statusEl.textContent = '此瀏覽器不支援語音輸入';
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'zh-TW';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    let listening = false;
+
+    recognition.onstart = () => {
+      listening = true;
+      btn.textContent = '停止錄音';
+      btn.style.background = '#e53935';
+      statusEl.textContent = '錄音中…請開始說話';
+    };
+    recognition.onend = () => {
+      listening = false;
+      btn.textContent = '🎤 語音輸入';
+      btn.style.background = '#ff9800';
+      statusEl.textContent = '';
+    };
+    recognition.onerror = (e) => {
+      statusEl.textContent = '錄音錯誤：' + (e.error || '');
+    };
+    recognition.onresult = (e) => {
+      const text = Array.from(e.results).map(r => r[0].transcript).join('');
+      if (text && textarea) {
+        textarea.value = (textarea.value ? textarea.value + '\n' : '') + text.trim();
+      }
+    };
+
+    btn.addEventListener('click', () => {
+      if (!listening) recognition.start();
+      else recognition.stop();
+    });
+  })();
+</script>
 </html>
