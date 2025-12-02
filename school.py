@@ -106,7 +106,7 @@ def upload():
 
     # 丟給 n8n
     payload = {"query": query_text}
-    r = requests.post(N8N_WEBHOOK, json=payload, timeout=90)
+    r = requests.post(N8N_WEBHOOK, json=payload, timeout=180)
     r.raise_for_status()
 
     raw = r.json()
