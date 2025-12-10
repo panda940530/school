@@ -18,5 +18,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 6. 設定容器啟動時要執行的預設命令
-#    這將執行 agent.py 中的自主迴圈
+#    這將執行 school.py 中的自主迴圈
 CMD ["python", "school.py"]

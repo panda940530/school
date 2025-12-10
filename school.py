@@ -2,7 +2,7 @@
 import requests
 from flask import Flask, request, render_template, make_response
 
-USE_TEST = int(os.getenv("USE_TEST", "1"))  # 1: 測試路徑 /webhook-test/school, 0: 正式路徑 /webhook/school
+USE_TEST = int(os.getenv("USE_TEST", "0"))  # 1: 測試路徑 /webhook-test/school, 0: 正式路徑 /webhook/school
 BASE = os.getenv("N8N_BASE", "http://localhost:5679")  # 本機 n8n 預設，容器內可設為 http://n8n:5679
 PATH = "/webhook-test/school" if USE_TEST else "/webhook/school"
 N8N_WEBHOOK = f"{BASE}{PATH}"
@@ -23,6 +23,7 @@ MONEY_FIELDS = {
     "executing_total_approved_amount",
     "approve_amount",
     "received_amount",
+    "spent_amount",
     "refund_amount_raw",
     "manage_fee",
 }
@@ -138,6 +139,7 @@ def upload():
         "close_date": "實結日期",
         "approve_amount": "計畫核定金額",
         "received_amount": "實收數",
+        "spent_amount": "實支數",
         "refund_amount_raw": "餘額繳回",
         "manage_fee": "管理費",
         "college_category": "學院",
@@ -197,7 +199,7 @@ def download_csv():
 
     resp = make_response("\ufeff" + csv_text)  # UTF-8-SIG
     resp.headers["Content-Type"] = "text/csv; charset=utf-8"
-    resp.headers["Content-Disposition"] = "attachment; filename=merged.csv"
+    resp.headers["Content-Disposition"] = "attachment; filename=school.csv"
     return resp
 
 
