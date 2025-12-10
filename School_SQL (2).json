@@ -1,0 +1,785 @@
+{
+  "name": "School_SQL",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1CqGpHpxWT5DdQJw1c5O7hHqiTUzLVki0",
+          "mode": "list",
+          "cachedResultName": "111-114部分產學B版(試跑檔)-代碼.xlsx",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1CqGpHpxWT5DdQJw1c5O7hHqiTUzLVki0/edit?usp=drivesdk&ouid=117496645125984693175&rtpof=true&sd=true"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -2400,
+        784
+      ],
+      "id": "676cf324-73a1-432e-a8e6-27afda6ea10f",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "zxFV5V7PSmri9g82",
+          "name": "Google Drive account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2608,
+        784
+      ],
+      "id": "961c3d1a-b1e5-4de4-bf0e-8a1f8b9f5272",
+      "name": "When clicking ‘Execute workflow’",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -80,
+        -96
+      ],
+      "id": "1714db2b-13b1-4ff5-8344-ee2534ad4d55",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "school",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3008,
+        -96
+      ],
+      "id": "219f6e88-8011-4386-854f-19ef667a3981",
+      "name": "Receive User Query",
+      "webhookId": "c1b6029c-65cf-438b-b495-6113a6eadc1c"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  column_name,\n  data_type,\n  is_nullable,\n  coalesce(column_default,'') as column_default\nfrom information_schema.columns\nwhere table_schema='public' and table_name='projects'\norder by ordinal_position;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2800,
+        80
+      ],
+      "id": "f5aeb3a6-b0fe-40d8-8b5b-41beb83db818",
+      "name": "Fetch Database Schema",
+      "credentials": {
+        "postgres": {
+          "id": "YrZYCBMuJXc0NucT",
+          "name": "local host"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select *\nfrom projects\norder by coalesce(date_part('year', start_date), 0) desc,\n         start_date desc\nlimit 20;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2608,
+        80
+      ],
+      "id": "77435a73-b1a8-461f-b357-a75cbd108da6",
+      "name": "Fetch Sample Records",
+      "credentials": {
+        "postgres": {
+          "id": "YrZYCBMuJXc0NucT",
+          "name": "local host"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 把節點名稱換成你實際的名字\nconst SCHEMA_NODE = \"Fetch Database Schema\";  // 回傳 columns 的那個節點\nconst SAMPLE_NODE = \"Fetch Sample Records\";  // 回傳 sample rows 的那個節點\n\n// 取回兩個節點的所有 items（注意：節點名稱要完全一致）\nlet cols, rows;\ntry {\n  cols = $items(SCHEMA_NODE, 0).map(i => i.json);\n} catch (e) {\n  throw new Error(`找不到節點：${SCHEMA_NODE}，請確認名稱完全一致並且有連線到 Code 節點`);\n}\ntry {\n  rows = $items(SAMPLE_NODE, 0).map(i => i.json);\n} catch (e) {\n  throw new Error(`找不到節點：${SAMPLE_NODE}，請確認名稱完全一致並且有連線到 Code 節點`);\n}\n\n// 小工具\nconst isNumber = v => v !== null && v !== \"\" && !isNaN(Number(v));\nconst distinct = arr => [...new Set(arr.filter(v => v !== null && v !== \"\"))];\n\n// 為每個欄位做簡要統計\nconst colStats = {};\nfor (const c of cols) {\n  const name = c.column_name;\n  const vals = rows.map(r => r[name]);\n  const ex = distinct(vals).slice(0, 3);\n\n  let stat = `- ${name} (${c.data_type}${c.is_nullable === 'NO' ? ' not null' : ''}) 例: ${ex.join(' / ')}`;\n  if (vals.some(isNumber)) {\n    const nums = vals.filter(isNumber).map(Number);\n    const min = Math.min(...nums), max = Math.max(...nums);\n    stat += `，範圍: ${min} ~ ${max}`;\n  }\n  colStats[name] = stat;\n}\n\nconst schemaText = [\n  '表：projects（主要欄位與示例）',\n  ...Object.values(colStats),\n].join('\\n');\n\n// 只取 5 筆樣本，避免 token 過大\nconst sampleText = JSON.stringify(rows.slice(0, 5), null, 0);\n\nlet question = $('Receive User Query').first().json.body.query;\n\n// 如果目前 item 沒有 query，就試著從「When chat message received」節點拿 chatInput\nif (!question) {\n  try {\n    const fromChat = $('When chat message received').first().json.chatInput;\n    if (fromChat) {\n      question = fromChat;\n    }\n  } catch (e) {\n    // 如果沒有那個節點或拿不到就跳過，不影響流程\n  }\n}\n\n// 最後再保險一下，至少是空字串不會是 undefined / null\nquestion = question || \"\";\n// 輸出給下一個 Chat 節點\nreturn [{\n  json: {\n    context: `${schemaText}\\n\\nSamples(5 rows JSON)：\\n${sampleText}`,\n    // 把原始使用者問題一併帶下去（依你的觸發節點字段調整）\n    question\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2416,
+        80
+      ],
+      "id": "95620720-1ca7-4398-94ff-094705125ca8",
+      "name": "Build LLM Query Context"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "25482304-a413-46c2-86de-383505a21f1b",
+              "name": "法律學院",
+              "value": 34,
+              "type": "number"
+            },
+            {
+              "id": "7577f078-9704-464e-b352-f5dd03663885",
+              "name": "商學院",
+              "value": 107,
+              "type": "number"
+            },
+            {
+              "id": "0a09117b-c2fe-4f7b-9d36-e569954d7727",
+              "name": "公共事務學院",
+              "value": 69,
+              "type": "number"
+            },
+            {
+              "id": "2b7279e4-6b6b-4ee7-a62b-47d5850f8d38",
+              "name": "社會科學學院",
+              "value": 63,
+              "type": "number"
+            },
+            {
+              "id": "6fa278b1-b069-43c2-9f3a-867fad3e0734",
+              "name": "人文學院",
+              "value": 51,
+              "type": "number"
+            },
+            {
+              "id": "dd9dc763-e659-40f9-afdc-d0f8b0870dab",
+              "name": "電機資訊學院",
+              "value": 35,
+              "type": "number"
+            },
+            {
+              "id": "452f6d41-811e-4e07-8897-4429e1e69610",
+              "name": "永續創新國際學院",
+              "value": 11,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2288,
+        -80
+      ],
+      "id": "53a0b3b2-d0f1-454a-850b-ecd5d7ea4d28",
+      "name": "Provide College People Mapping"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -2144,
+        80
+      ],
+      "id": "6540a027-f174-47d3-b5b6-4157afb357a9",
+      "name": "Merge Context and Domain Knowledge"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=你是一個專門為 PostgreSQL 資料庫產生查詢語句（SQL）與圖表規格（Chart Specification）的智慧分析助理。\n你不能編造資料，也不能修改資料，只能輸出單一條 PostgreSQL SELECT 或 WITH 查詢語句。\n\n### 資料表結構（projects）\n下方是資料表的實際結構與前幾筆資料（供你參考）：\n{{ $json.context }}\n\n常用欄位如下：\n--project_code (text) ：計畫代碼\n--project_name (text) ：計畫名稱\n--exec_unit (text) ：執行單位\n--fund_source (text) ：經費來源\n--unit_category (text) ：單位類別（政府／企業／其他）\n--pi_code (text) ：主持人代碼\n--start_date (date) ：起始日期\n--end_date (date) ：應結日期\n--extend_date_raw (date) ：延長日期\n--close_date (date)：實結日期\n--approve_amount (bigint) ：核定金額\n--received_amount (bigint) ：實收數\n--spent_amount (bigint) ：實支數\n--refund_amount_raw(text):餘額繳回\n--manage_fee (bigint) ：管理費\n--college_category(text):學院\n\n\n---\n### 【衍生欄位與命名規則（非常重要）】\n當你需要做彙總統計或分析時，請盡量使用下面這些「欄位別名名稱」，\n如果沒有該欄位對應在額外命名，\n這些名稱會被後續系統用來對應中文欄位名稱與圖表：\n\n#### 1. 年度與期間相關\n-單純輸出日期時統一使用以下方法\n  -寫法：TO_CHAR(start_date, 'YYYY-MM-DD') AS start_date,\n  -寫法：TO_CHAR(end_date, 'YYYY-MM-DD') AS end_date\n- 統一使用：`approve_year` 代表「核定年度」\n  - 寫法：`(EXTRACT(YEAR FROM start_date) - 1911) AS approve_year`\n- 若需要「計畫期間天數」：`(end_date - start_date) AS duration_days`\n\n#### 2. 經費總額與件數\n當題目提到「經費總額、件數」時，請用以下別名：\n- 計畫件數：`COUNT(*) AS project_count`\n- 核定經費總額（以 approve_amount 加總）：  \n  `SUM(approve_amount) AS total_approved_amount`\n\n> 例：核定年度為起始之經費總額、件數  \n> 應輸出欄位至少包含：`approve_year, total_approved_amount, project_count`\n\n#### 3. 執行中計畫\n「執行中計畫」定義（結束日期在X年度）：\nWHERE EXTRACT(YEAR FROM end_date) >= X;\n\n當問題是「執行中計畫件數、金額」時，請至少輸出：\nexecuting_project_count（執行中計畫件數）\nexecuting_total_approved_amount（執行中計畫經費總額）\n\n若需要分年度，可同時輸出 approve_year。\n\n#### 4. 正在執行計畫\n「正在執行計畫」定義（任一特定年度 Y 是否屬於執行中）：\nstart_date <= CURRENT_DATE\n且 (end_date IS NULL OR end_date >= CURRENT_DATE)\n\n當問題是「正在執行計畫件數、金額」時，請至少輸出：\nexecuting_now_project_count（正在執行計畫件數）\nexecuting_now_total_approved_amount（正在執行計畫經費總額）\n\n#### 5. 多年期計畫\n「多年期」定義：\n- `start_date IS NOT NULL`\n- `end_date IS NOT NULL`\n- `(end_date - start_date) > 365`\n\n需要統計多年期計畫時，請至少輸出：\n- `multi_year_project_count`：多年期計畫件數  \n  寫法示例：`COUNT(*) AS multi_year_project_count`\n\n如需依年度或學院拆分，可同時輸出：\n- `approve_year`\n- `college_category`\n- `exec_unit`\n\n#### 6. 各學院、教學單位相關統計\n\n當題目提到「各學院、教學單位」時，請至少輸出：\n- `college_category`：學院\n- `exec_unit`：執行單位（教學單位）\n\n當題目提到特定學院如「商學院、法學院」時，請至少輸出：\n- `college_category`：學院\n\n常用彙總欄位：\n- `COUNT(*) AS project_count`：該單位承接計畫件數\n- `SUM(approve_amount) AS total_approved_amount`：該單位核定金額總額\n- `COUNT(DISTINCT pi_code) AS pi_count`：承接計畫的教師人數（以主持人代碼區分）\n\n若需要計算「承接計畫教師比例、人均值」，請至少輸出：\n- `project_per_teacher`：人均計畫數  \n人均值=該學院執行計畫總數/該學院總人數  \n- `project_teacher_ratio`:執行計畫之教師比例\n教師比例=該學院執行計畫人數/該學院總人數 \n底下為不同學院總人數\n法律學院:{{ $json['法律學院'] }}人,\n商學院:{{ $json['商學院'] }}人,\n公共事務學院:{{ $json['公共事務學院'] }}人,\n社會科學學院:{{ $json['社會科學學院'] }}人,\n人文學院:{{ $json['人文學院'] }}人,\n電機資訊學院:{{ $json['電機資訊學院'] }}人,\n永續創新國際學院:{{ $json['永續創新國際學院'] }}人\n\n> 這些別名將用來呈現：  \n> 各學院、教學單位計畫核定數、承接計畫教師比例、人均值  \n> 請依問題需要選擇合適的欄位。\n\n#### 6. 成長率相關（年度成長）\n若題目提到「計畫件數及金額成長率」是指計畫件數、金額成長率。\n\n若題目提到「計畫成長率」、「相較於以前年度之成長情形」，請使用年度彙總，再計算下列欄位：\n\n先彙總每年度：\n- `approve_year`\n- `project_count`：當年度件數\n- `total_approved_amount`：當年度總金額\n\n\n\n再使用視窗函數計算與前一年度相比的成長：\n\n- 件數成長率：\n  `project_growth_rate`  \n  例：`(project_count - LAG(project_count) OVER (ORDER BY approve_year))::numeric / NULLIF(LAG(project_count) OVER (ORDER BY approve_year), 0) AS project_growth_rate`\n\n- 金額成長率：\n  `amount_growth_rate`  \n  例：`(total_approved_amount - LAG(total_approved_amount) OVER (ORDER BY approve_year))::numeric / NULLIF(LAG(total_approved_amount) OVER (ORDER BY approve_year), 0) AS amount_growth_rate`\n\n如要分學院／單位，視窗函數請加上 `PARTITION BY college_category` 或 `PARTITION BY college_category, exec_unit`。\n\n對應需求：\n計畫成長率：本校統計年度之承接件數、總金額相較於以前年度之成長情形，以及各學院教學單位之成長情形。\n當題目提到「成長率」相關，才顯示件數成長率或金額成長率\n\n請至少輸出:\n-兩個年度的`approve_year`,total_approved_amount, project_count`,`project_growth_rate`,`amount_growth_rate`\n\n#### 7. 教師承接案量（Top PI）\n當題目提到「以金額、件數計算全校近年來承接產學案量能較高之教師」時，請輸出：\n\n- `pi_code`：教師代碼\n- `project_count`：該教師承接件數  \n  例：`COUNT(*) AS project_count`\n- `total_approved_amount`：該教師總核定金額  \n  例：`SUM(approve_amount) AS total_approved_amount`\n\n如有年度條件（例如「近三年」），請使用日期規則過濾後，再依 `pi_code` 彙總。\n\n#### 8. 歷年研究計畫承接情況（件數、金額、委託單位）\n當題目提到「歷年研究計畫案承接情況(件數、金額、委託單位)」，請至少輸出：\n\n- `approve_year`\n- `fund_source` 或 `unit_category`：委託／經費來源\n- `project_count`：該來源的件數\n- `total_approved_amount`：該來源的總核定金額\n\n#### 9.單位類別相關\n當題目提到單位類別按照順序政府、企業、其他輸出結果。\n\n#### 圖表欄位對應規則：\n- `approve_year`, `start_date` → 通常作為 x_field  \n- `college_category`, `exec_unit`, `fund_source` → 可作為分類軸 x_field  \n- `project_count`, `pi_count` → 件數、教師數量，作為 y_field  \n- `total_approved_amount`, `approve_amount` → 金額，作為 y_field  \n- 若同時出現 `project_count` 與 `total_approved_amount` → y_field 包含兩者，chart_type 為 \"dual_axis\"\n- title 應明確描述時間與主題，如「111–114年度本校承接計畫件數與金額」\n- note 應明確每個y_field的單位\n- chart_type 當使用者輸入問題裡有\"統計圖\",則chart_enable是true,否則是false\n---\n### 使用者輸入的問題\n{{ $json.question }}\n---\n### 輸出規則\n根據以下問題，請輸出：\n1. 一段可以查詢 PostgreSQL 資料庫的 SQL 語句。\n2. 一份圖表規格 (JSON 格式)，包含：\n   - chart_enable:啟用圖表(true/false)\n   - chart_type：建議的圖表類型 (例如 \"bar\", \"line\", \"dual_axis\", \"pie\" 等)\n   - x_field：x 軸欄位名稱\n   - x_field_unit：x軸的單位\n   - y_field：y 軸欄位名稱或多個欄位\n   - y_field_unit：y軸的單位(件數、人數、金額(元))\n   - title：圖表標題\n   - note：每個y_field的單位\n   \n請以 JSON 形式輸出，例如：\n{\n  {\n  \"sql\": \"SELECT ... FROM projects ...\",\n  \"chart\": {\n    \"chart_enable\":\"...\",\n    \"chart_type\": \"...\",\n    \"x_field\": [\"...\"],\n    \"x_field_unit\": [\"...\"],\n    \"y_field\": [\"...\"],\n    \"y_field_unit\": [\"...\"],\n    \"title\": \"...\",\n    \"note\": \"...\"\n  }\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1984,
+        80
+      ],
+      "id": "7020a5f3-0873-4767-96ad-454c632baf09",
+      "name": "LLM Generate SQL & ChartSpec",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "notesInFlow": false,
+      "retryOnFail": false,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "KlkxB6UckWqVMde2",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1) 取出模型回傳的文字（Gemini：content.parts[0].text）\nlet raw =\n  items[0]?.json?.content?.parts?.[0]?.text ??\n  items[0]?.json?.text ??\n  \"\";\n\n// 去掉 ```json / ``` 圍欄\nraw = raw.replace(/```json|```/gi, \"\").trim();\n\nlet sql = \"\";\ntry {\n  // 2) 先嘗試當成 JSON 解析（例如 {\"sql\":\"SELECT ...\"}）\n  const obj = JSON.parse(raw);\n  sql = String(obj.sql ?? obj.SQL ?? \"\").trim();\n} catch (e) {\n  // 3) 若不是 JSON，就當成純 SQL\n  sql = String(raw).trim();\n}\n\n// 允許結尾分號；移除多餘空白\nsql = sql.replace(/;+\\s*$/g, \"\").trim();\n\n// 4) 安全檢查（只讀、單語句、白名單表）\nif (!/^(\\s*with|\\s*select)\\b/i.test(sql)) {\n  throw new Error(\"只允許 SELECT/WITH 查詢\");\n}\nif (sql.split(\";\").length > 1) {\n  throw new Error(\"只允許單一條 SQL\");\n}\nif (!/\\bprojects\\b/i.test(sql)) {\n  throw new Error(\"只允許查詢表：projects\");\n}\n\n// 沒指定上限自動補 LIMIT\nif (!/limit\\s+\\d+/i.test(sql)) sql += \" LIMIT 100\";\n\nreturn [{ json: { sql } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1680,
+        80
+      ],
+      "id": "d047cc65-dd3b-43a6-8d81-4d026fa9d93f",
+      "name": "Validate & Extract SQL"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 取得所有輸入\nconst items = $input.all();\n\n// 1) 取出模型文字（盡量相容不同結構）\nlet raw =\n  items.find(it => it.json?.content?.parts?.[0]?.text)?.json?.content?.parts?.[0]?.text ??\n  items.find(it => typeof it.json?.text === 'string')?.json?.text ??\n  items[0]?.json?.content?.text ??\n  items[0]?.json?.text ??\n  \"\";\n\n// 2) 優先抓 ```json ... ``` 內文；沒有就用整段\nlet m = raw.match(/```json\\s*([\\s\\S]*?)```/i) || raw.match(/```\\s*([\\s\\S]*?)```/i);\nlet body = m ? m[1] : raw;\n\n// 3) 只截取第一個 { 到最後一個 }，去掉雜訊\nconst s = body.indexOf(\"{\");\nconst e = body.lastIndexOf(\"}\");\nif (s >= 0 && e > s) body = body.slice(s, e + 1);\n\n// 4) 嘗試解析 JSON（順手處理可能的註解/尾逗號）\nfunction safeParseJson(str) {\n  let t = String(str)\n    .replace(/\\/\\*[\\s\\S]*?\\*\\//g, \"\")\n    .replace(/\\/\\/[^\\n\\r]*/g, \"\")\n    .replace(/,\\s*([}\\]])/g, \"$1\");\n  try { return JSON.parse(t); } catch (e) { return {}; }\n}\nconst obj = safeParseJson(body) || {};\n\n// 5) 正規化 chart 欄位\nconst ch = obj.chart || {};\n\nconst toBool = (v) => {\n  if (typeof v === 'boolean') return v;\n  const s = String(v ?? \"\").trim().toLowerCase();\n  return [\"true\",\"1\",\"yes\",\"y\"].includes(s);\n};\n\nconst arrify = (v) => Array.isArray(v) ? v : (v != null && v !== \"\" ? [v] : []);\n\n// x_field / x_field_unit 轉陣列並對齊長度\nconst xFieldArr = arrify(ch.x_field).map(String);\nlet xUnitArr    = arrify(ch.x_field_unit).map(String);\nif (xUnitArr.length < xFieldArr.length) {\n  xUnitArr = [\n    ...xUnitArr,\n    ...Array(xFieldArr.length - xUnitArr.length).fill(\"\")\n  ];\n} else if (xUnitArr.length > xFieldArr.length) {\n  xUnitArr = xUnitArr.slice(0, xFieldArr.length);\n}\n\n// y_field / y_field_unit 轉陣列並對齊長度\nconst yFieldArr = arrify(ch.y_field).map(String);\nlet yUnitArr    = arrify(ch.y_field_unit).map(String);\nif (yUnitArr.length < yFieldArr.length) {\n  yUnitArr = [\n    ...yUnitArr,\n    ...Array(yFieldArr.length - yUnitArr.length).fill(\"\")\n  ];\n} else if (yUnitArr.length > yFieldArr.length) {\n  yUnitArr = yUnitArr.slice(0, yFieldArr.length);\n}\n\n// 6) 輸出到下一節點：一個 item，json 內含 sql 與 chart\nconst out = {\n  charts: {\n    chart_enable: toBool(ch.chart_enable ?? false),\n    chart_type: String(ch.chart_type ?? \"\"),\n    x_field: xFieldArr,\n    x_field_unit: xUnitArr,\n    y_field: yFieldArr,\n    y_field_unit: yUnitArr,\n    title: String(ch.title ?? \"\"),\n    note: String(ch.note ?? \"\")\n  }\n};\nreturn [{ json: out }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1680,
+        -64
+      ],
+      "id": "b95db627-2b66-42df-bd37-81033cd124be",
+      "name": "Normalize ChartSpec"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $json.sql }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1312,
+        80
+      ],
+      "id": "3712945e-18b7-47db-aa1e-51b85e002c74",
+      "name": "Execute LLM SQL",
+      "credentials": {
+        "postgres": {
+          "id": "YrZYCBMuJXc0NucT",
+          "name": "local host"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 把本次 SQL 的所有列整理成陣列 rows，並嘗試把數字字串轉成數字\nconst rows = $items(\"Execute LLM SQL\").map(i => {\n  const r = {...i.json};\n  for (const k of Object.keys(r)) {\n    const n = Number(r[k]);\n    if (!Number.isNaN(n) && r[k] !== \"\") r[k] = n;\n  }\n  return r;\n});\n\n// 盡量從上游取到使用者問題與實際執行的 SQL\nconst question =\n  $json.question ?? \n  $('Receive User Query').first().json.body?.query ??\n  $item(0).$node[\"When chat message received\"]?.json?.chatInput ?? //會先執行前面的，在執行後面的\n  \"\";\n\nconst sqlText =\n  $item(0).$node[\"Validate & Extract SQL\"]?.json?.sql ??\n  $json.sql ?? \"\";\n\nreturn [{\n  json: {\n    question,\n    sql: sqlText,\n    rows,               // 查詢結果（陣列）\n    row_count: rows.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        80
+      ],
+      "id": "1b0cccde-6ce7-4c94-a021-dcf424d283b8",
+      "name": "Prepare LLM Explanation Input"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=你是一位資料分析助理，根據輸入的「使用者問題、實際 SQL、查詢結果 JSON (rows 陣列)」產生中文解讀。\n\n任務說明:\n- 如果 rows 為空或 undefined，請回覆：「查無資料，請確認條件或年度是否正確。」\n- 否則，請閱讀 rows 內容：\n  - 若 rows 只有一列，請將各欄位以「欄位名：值」方式逐項說明，並補一句自然語句摘要。\n  - 若 rows 超過 1 列，請：\n    1. 先用 1～2 句話摘要說明主要統計（總金額、件數、趨勢等）。\n    2. 以 Markdown 表格呈現前 10 列，欄位名為表頭。\n- 數字請自動加上千分位；金額以「元」為單位；件數以「件」表示。\n- 禁止輸出 JSON、程式碼或 SQL，只能輸出可讀的文字說明。\n\n輸入資料:\n問題：{{ $json.question }}\nSQL：{{ $json.sql }}\n查詢結果(JSON)：{{ JSON.stringify($json.rows, null) }}\n\n常用資料庫資料結構:\n--project_code (text) ：計畫代碼\n--project_name (text) ：計畫名稱\n--exec_unit (text) ：執行單位\n--fund_source (text) ：經費來源\n--unit_category (text) ：單位類別（政府／企業／其他）\n--pi_code (text) ：主持人代碼\n--start_date (date) ：起始日期\n--end_date (date) ：應結日期\n--extend_date_raw (date) ：延長日期\n--close_date (date)：實結日期\n--approve_amount (bigint) ：核定金額\n--received_amount (bigint) ：實收數\n--spent_amount (bigint) ：實支數\n--refund_amount_raw(text):餘額繳回\n--manage_fee (bigint) ：管理費\n--college_category(text):學院\n\n輸出格式:\n直接輸出可讀文字（可含 Markdown 表格），不得輸出程式碼區塊或 JSON。"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        80
+      ],
+      "id": "8c27d5ed-1ec3-43a4-bea9-f301c58c2ece",
+      "name": "LLM Generate Explanation",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "KlkxB6UckWqVMde2",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -480,
+        -112
+      ],
+      "id": "80cc2923-9f3e-464f-a9f9-6f324ab654ca",
+      "name": "Merge QueryResult & Explanation & ChartSpec"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 收所有輸入\nconst items = $input.all();\n\nlet rows = [];\nlet answer = \"\";\nlet chart = null;\n\n// 掃描所有輸入\nfor (const it of items) {\n  const j = it.json;\n\n  // 1) AI 主要回覆（LLM model）\n  if (j.content?.parts?.[0]?.text && j.content.role === \"model\") {\n    answer = j.content.parts[0].text;\n    continue;\n  }\n\n  // 2) 圖表規格（前一節點的 charts）\n  if (j.charts) {\n    chart = j.charts;\n    continue;\n  }\n\n  // 3) 其它資料判定為 rows\n  rows.push(j);\n}\n\n// 最終輸出 —— 只包含 rows / answer / chart\nreturn [\n  {\n    json: {\n      rows,\n      answer,\n      chart\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        -96
+      ],
+      "id": "bf4031b6-a0c1-4bfd-8278-587002a0c833",
+      "name": "Send Response"
+    },
+    {
+      "parameters": {
+        "formTitle": "上傳資料進資料庫",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "data",
+              "fieldType": "file",
+              "acceptFileTypes": ".xlsx"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        -2992,
+        608
+      ],
+      "id": "71f5a31e-1621-4685-beff-1a73d98bcdb7",
+      "name": "Start Import Process",
+      "webhookId": "2360562f-8060-4cf8-b983-960e2c572177"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -2608,
+        608
+      ],
+      "id": "7d83dcf2-72e2-401c-8317-524cc7dfad0b",
+      "name": "Parse Uploaded File"
+    },
+    {
+      "parameters": {
+        "jsCode": "const itemsList = items.map((it, i) => {\n  const r = it.json;\n  return `${i+1}. ${r.fund_source}`;\n}).join(\"\\n\");\n\nreturn [{\n  json: {\n    prompt: `以下是經費來源列表，請依照每一條的編號判斷其所屬單位：\n- 若屬於政府單位輸出「政府」\n- 若屬於企業部門輸出「企業」\n- 若屬於其他組織輸出「其他」\n\n政府部門-政府部門包括中央政府或地方政府，並包含由行政院國科會所訂定之中華民國科技機構名錄之總統府及行政院各部會所屬科技機構，例如：中央研究院、教育部、國科會…等。\n企業部門-企業部門包括國營與民營企業\n其他單位-其他大專校院及其附設醫院和育成中心、法人機構、學會、專業學術國體及其他非營利機構、國外機構等承接計畫，如：財團法人工業技術研究院、各級醫療院所、農會、漁會、信用合作社等。\n\n\n請輸出 JSON 格式，例如：\n[\n {\"id\": 1, \"分類\": \"政府\"},\n {\"id\": 2, \"分類\": \"企業\"},\n {\"id\": 3, \"分類\": \"其他\"}\n]\n\n資料如下：\n${itemsList}`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2016,
+        608
+      ],
+      "id": "f336eca1-f1c1-4aed-b2ec-bdfdde8148fb",
+      "name": "Build Funding Classification Prompt"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{$json.prompt}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1728,
+        608
+      ],
+      "id": "d9734eaa-1fbc-4709-b4e9-a60d5afbe0a9",
+      "name": "LLM Classify Funding Source",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "KlkxB6UckWqVMde2",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sourceData = $items(\"Normalize Project Data\").map(i => i.json);\n\n// 取得 AI 回傳結果（批次 JSON）\nlet text = items[0].json.content?.parts?.[0]?.text || items[0].json.text || \"\";\ntext = text.replace(/```json|```/g, \"\").trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(text);\n} catch (err) {\n  throw new Error(\"無法解析 AI 回傳的 JSON，請檢查格式。\");\n}\n\n// 建立 id → 分類 的對照表\nconst map = {};\nfor (const row of parsed) {\n  const id = row.id || row.ID || row.Id;\n  const label = row[\"分類\"] || row[\"類別\"] || row[\"category\"] || \"\";\n  if (id != null) map[id] = label.trim();\n}\n\n// 合併結果\nconst combined = sourceData.map((r, idx) => ({\n  json: {\n    ...r,\n    unit_category: map[idx + 1] || \"其他\" // AI的id從1開始\n  }\n}));\n\nreturn combined;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1328,
+        608
+      ],
+      "id": "4caf6a86-26f5-4c4b-9767-5789d57cc8ea",
+      "name": "Apply Funding Classification"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into projects (\n  project_code, project_name, exec_unit, fund_source, unit_category,\n  pi_code, start_date, end_date, extend_date_raw, close_date,\n  approve_amount, received_amount, spent_amount, refund_amount_raw, manage_fee\n) values (\n  '{{$json.project_code}}',\n  '{{$json.project_name}}',\n  '{{$json.exec_unit}}',\n  '{{$json.fund_source}}',\n  '{{$json.unit_category}}',\n  '{{$json.pi_code}}',\n  {{$json.start_date ? `'${$json.start_date}'` : 'null'}},\n  {{$json.end_date ? `'${$json.end_date}'` : 'null'}},\n  {{$json.extend_date_raw ? \"'\" + $json.extend_date_raw.replaceAll(\"'\", \"''\") + \"'\" : 'null'}},\n  {{$json.close_date ? `'${$json.close_date}'` : 'null'}},\n  {{$json.approve_amount ?? 'null'}},\n  {{$json.received_amount ?? 'null'}},\n  {{$json.spent_amount ?? 'null'}},\n  '{{$json.refund_amount_raw}}',\n  {{$json.manage_fee ?? 'null'}}\n)\non conflict (project_code) do update set\n  project_name = excluded.project_name,\n  exec_unit = excluded.exec_unit,\n  fund_source = excluded.fund_source,\n  unit_category = excluded.unit_category,\n  pi_code = excluded.pi_code,\n  start_date = excluded.start_date,\n  end_date = excluded.end_date,\n  extend_date_raw = excluded.extend_date_raw,\n  close_date = excluded.close_date,\n  approve_amount = excluded.approve_amount,\n  received_amount = excluded.received_amount,\n  spent_amount = excluded.spent_amount,\n  refund_amount_raw = excluded.refund_amount_raw,\n  manage_fee = excluded.manage_fee;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1120,
+        608
+      ],
+      "id": "8b2c2984-27bd-4c30-b1f5-ac637fa96e2b",
+      "name": "Upsert Project Record",
+      "credentials": {
+        "postgres": {
+          "id": "YrZYCBMuJXc0NucT",
+          "name": "local host"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE projects p\nSET college_category = c.college_name\nFROM college_map c\nWHERE p.exec_unit LIKE '%' || c.unit_keyword || '%';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -912,
+        608
+      ],
+      "id": "e7eb88ff-fe13-4c62-a7ac-8f615573dc48",
+      "name": "Update College Mapping",
+      "credentials": {
+        "postgres": {
+          "id": "YrZYCBMuJXc0NucT",
+          "name": "local host"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 取出全部 rows\nconst all = items.map(i => i.json);\n\n// 取第一筆為標題列\nconst headerRow = Object.values(all[0]);\nconst dataRows = all.slice(1);\n\n// 幫每個欄位去掉多餘空白\nconst clean = s => (s == null ? \"\" : String(s).trim());\n\n// 將一列的陣列轉為對應 JSON\nconst records = dataRows.map(r => {\n  const obj = {};\n  headerRow.forEach((key, i) => {\n    obj[clean(key)] = clean(Object.values(r)[i]);\n  });\n  return obj;\n});\n\n// 轉換為你的欄位格式\nconst roc = v => {\n  const t = clean(v);\n  const m = t.match(/^(\\d{2,3})[./](\\d{1,2})[./](\\d{1,2})$/);\n  if (!m) return null;\n  return `${1911 + parseInt(m[1], 10)}-${m[2].padStart(2, \"0\")}-${m[3].padStart(2, \"0\")}`;\n};\nconst N = v => {\n  const n = Number(clean(v).replace(/,/g, \"\"));\n  return Number.isFinite(n) ? n : null;\n};\n\nreturn records.map(r => ({\n  json: {\n    project_code:   r[\"計畫代碼\"],\n    project_name:   r[\"計畫名稱\"],\n    exec_unit:      r[\"執行單位\"],\n    fund_source:    r[\"經費來源\"],\n    pi_code:        r[\"計畫主持人(代號)\"],\n    start_date:     roc(r[\"起始日期\"]),\n    end_date:       roc(r[\"應結日期\"]),\n    extend_date_raw:roc(r[\"延長日期\"]),\n    close_date:     roc(r[\"實結日期\"]),\n    approve_amount: N(r[\"計畫核定數\"]),\n    received_amount:N(r[\"實收數\"]),\n    spent_amount:   N(r[\"實支數\"]),\n    refund_amount_raw:r[\"餘額繳回\"],\n    manage_fee:     N(r[\"管理費\"]),\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2304,
+        608
+      ],
+      "id": "46726a82-4b5c-4f55-8723-8d124c8cf366",
+      "name": "Normalize Project Data"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Download file": {
+      "main": [
+        []
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive User Query": {
+      "main": [
+        [
+          {
+            "node": "Fetch Database Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Database Schema": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sample Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sample Records": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Query Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Query Context": {
+      "main": [
+        [
+          {
+            "node": "Provide College People Mapping",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Context and Domain Knowledge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Provide College People Mapping": {
+      "main": [
+        [
+          {
+            "node": "Merge Context and Domain Knowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Context and Domain Knowledge": {
+      "main": [
+        [
+          {
+            "node": "LLM Generate SQL & ChartSpec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Generate SQL & ChartSpec": {
+      "main": [
+        [
+          {
+            "node": "Validate & Extract SQL",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Normalize ChartSpec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Extract SQL": {
+      "main": [
+        [
+          {
+            "node": "Execute LLM SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize ChartSpec": {
+      "main": [
+        [
+          {
+            "node": "Merge QueryResult & Explanation & ChartSpec",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Execute LLM SQL": {
+      "main": [
+        [
+          {
+            "node": "Prepare LLM Explanation Input",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge QueryResult & Explanation & ChartSpec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare LLM Explanation Input": {
+      "main": [
+        [
+          {
+            "node": "LLM Generate Explanation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Generate Explanation": {
+      "main": [
+        [
+          {
+            "node": "Merge QueryResult & Explanation & ChartSpec",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge QueryResult & Explanation & ChartSpec": {
+      "main": [
+        [
+          {
+            "node": "Send Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Import Process": {
+      "main": [
+        [
+          {
+            "node": "Parse Uploaded File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Uploaded File": {
+      "main": [
+        [
+          {
+            "node": "Normalize Project Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Funding Classification Prompt": {
+      "main": [
+        [
+          {
+            "node": "LLM Classify Funding Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Classify Funding Source": {
+      "main": [
+        [
+          {
+            "node": "Apply Funding Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Funding Classification": {
+      "main": [
+        [
+          {
+            "node": "Upsert Project Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Project Record": {
+      "main": [
+        [
+          {
+            "node": "Update College Mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Project Data": {
+      "main": [
+        [
+          {
+            "node": "Build Funding Classification Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3bf33c6b-aadd-4620-b116-1b600e80bd13",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2e624de9bf8a8e3cc24f9a2382f8b1b80ef27f84f24fbc4870dbfd51ba6ad9a7"
+  },
+  "id": "ULAq7NUIWWWMWz34",
+  "tags": []
+}
