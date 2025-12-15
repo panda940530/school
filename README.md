@@ -236,7 +236,7 @@ n8n 採用了「流程圖」的概念。您在一個無限延伸的畫布上，�
 
 點選run之後，在name填入n8n，Host port裡填入5678，點擊run。
 
-<img width="962" height="941" alt="image" src="https://github.com/user-attachments/assets/4e97bca5-4f07-4faf-ab54-090edfc934bb" />
+<img width="711" height="695" alt="image" src="https://github.com/user-attachments/assets/4e97bca5-4f07-4faf-ab54-090edfc934bb" />
 
 回到containers，會發現多了一個n8n，確保左邊的燈是綠的，如果燈不是綠的點擊左側的start鍵。
 
@@ -248,15 +248,15 @@ n8n 採用了「流程圖」的概念。您在一個無限延伸的畫布上，�
 
 可以不用填任何東西直接點 Get started。
 
-<img width="2559" height="1231" alt="image" src="https://github.com/user-attachments/assets/d0ded24b-790c-4b88-83a1-42753f49c09e" />
+<img width="711" height="342" alt="image" src="https://github.com/user-attachments/assets/d0ded24b-790c-4b88-83a1-42753f49c09e" />
 
 這個也可以直接點 skip。
 
-<img width="2557" height="1233" alt="image" src="https://github.com/user-attachments/assets/afade37d-850c-41aa-a9cf-bd19f215b195" />
+<img width="711" height="343" alt="image" src="https://github.com/user-attachments/assets/afade37d-850c-41aa-a9cf-bd19f215b195" />
 
 這樣你就會獲得一個空的本地自架的n8n，點選中間的 Start from scratch，開啟你的第一個工作流\!
 
-<img width="2558" height="1157" alt="image" src="https://github.com/user-attachments/assets/eba5fd59-2d74-42b4-b790-bfbc8088d03c" />
+<img width="711" height="322" alt="image" src="https://github.com/user-attachments/assets/eba5fd59-2d74-42b4-b790-bfbc8088d03c" />
 
 ---
 
