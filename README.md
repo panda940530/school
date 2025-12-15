@@ -413,8 +413,6 @@ n8n 的工作流本質上就是一串 JSON 文字。
 
 在我們的架構中，最關鍵的挑戰在於：**如何讓不懂程式碼的使用者，能夠查詢複雜的資料庫？** 上圖清晰地展示了這一過程的「雙階段 AI 處理」邏輯。我們可以將其拆解為五個關鍵步驟：
 
-<img width="2053" height="246" alt="image" src="https://github.com/user-attachments/assets/01a2ddab-e4e4-4491-8371-c75315b440f4" />
-
 #### A.意圖輸入 (User Query)
 
 一切始於最左側的 **「使用者」**。使用者不需要學習 SQL 語法，只需使用 **「自然語言」**（如中文或英文）提出問題。
@@ -592,7 +590,9 @@ AI 會回傳標準的 JSON：
 
 <h2 id="workflow">系統核心工作流拆解 (System Core Workflow Decomposition)</h2>
 
-在 n8n 中，我們將這個複雜的思考過程拆解為五個精密咬合的齒輪。不同於簡單的聊天機器人，雖然這個流程並非完整的 AI Agent，但它已展現 **Agentic Workflow** 的核心特徵——能夠感知環境（由 Schema 與 Sample Data 所構成的上下文）、使用工具（PostgreSQL 作為資料查詢接口）、並產生結構化輸出（SQL 查詢語句與圖表規格）。
+在 n8n 中，我們將這個複雜的思考過程拆解為五個精密咬合的齒輪。不同於簡單的聊天機器人，雖然這個流程並非完整的 AI Agent，但它已展現 **Agentic Workflow** 的核心特徵——能夠感知環境（由 Schema 與 Sample Data 所構成的上下文）、使用工具（PostgreSQL 作為資料查詢接口）、並產生結構化輸出（SQL 查詢語句與圖表規格），以下是n8n工作流：
+
+<img width="2053" height="246" alt="image" src="https://github.com/user-attachments/assets/01a2ddab-e4e4-4491-8371-c75315b440f4" />
 
 ### 第一階段：動態情境注入 (Dynamic Context Injection)
 
