@@ -223,7 +223,7 @@ n8n 採用了「流程圖」的概念。您在一個無限延伸的畫布上，�
 
 安裝好之後會看到，這時什麼東西都沒有。
 
-![][image7]
+<img width="1197" height="745" alt="image" src="https://github.com/user-attachments/assets/cc52221d-9667-4c5c-b545-a963bb421982" />
 
 我們在上面搜尋欄搜尋n8n，對n8nio/n8n點選Pull。
 
