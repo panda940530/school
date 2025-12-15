@@ -244,7 +244,7 @@ n8n 採用了「流程圖」的概念。您在一個無限延伸的畫布上，�
 
 點擊5678:5678會到一個瀏覽器，需要設置帳號，設置完帳號按Next。
 
-<img width="692" height="1152" alt="image" src="https://github.com/user-attachments/assets/6a009b1b-278c-4294-95e5-41d4cbe0d5cc" />
+<img width="240" height="400" alt="image" src="https://github.com/user-attachments/assets/6a009b1b-278c-4294-95e5-41d4cbe0d5cc" />
 
 可以不用填任何東西直接點 Get started。
 
