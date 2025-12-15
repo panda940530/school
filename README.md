@@ -413,6 +413,8 @@ n8n 的工作流本質上就是一串 JSON 文字。
 
 在我們的架構中，最關鍵的挑戰在於：**如何讓不懂程式碼的使用者，能夠查詢複雜的資料庫？** 上圖清晰地展示了這一過程的「雙階段 AI 處理」邏輯。我們可以將其拆解為五個關鍵步驟：
 
+<img width="2053" height="246" alt="image" src="https://github.com/user-attachments/assets/01a2ddab-e4e4-4491-8371-c75315b440f4" />
+
 #### A.意圖輸入 (User Query)
 
 一切始於最左側的 **「使用者」**。使用者不需要學習 SQL 語法，只需使用 **「自然語言」**（如中文或英文）提出問題。
@@ -521,6 +523,8 @@ AI 不知道你的資料庫長什麼樣子。你需要透過 **System Prompt** �
 在原始 Excel 的「經費來源 (`fund_source`)」欄位中，可能會出現數百種不同的寫法（如：司法院、農業部、公平交易委員會、XX有限公司）。若要進行統計分析（例如：政府案 vs 企業案），傳統作法需要寫數百行的 `if-else` 或維護龐大的對照表，或者是人工一個一個填入對應的類型
 
 在本系統中，我們利用 **Google Gemini** 進行智慧分類。以下是 n8n 工作流中的實作邏輯：
+
+<img width="1993" height="253" alt="image" src="https://github.com/user-attachments/assets/da04289c-c3e1-41c4-896f-d09cea6c0c91" />
 
 #### A. 資料預處理與 Prompt 組合 (Code Node)
 
