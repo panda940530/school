@@ -219,15 +219,15 @@ n8n 採用了「流程圖」的概念。您在一個無限延伸的畫布上，�
 
 打開下載好的安裝包，勾選Use WSL 2 instead of Hyper-V，安裝好之後重啟電腦。
 
-<img width="1350" height="934" alt="image" src="https://github.com/user-attachments/assets/263ba66e-4ef9-4f36-ae38-99b80e96cde7" />
+<img width="711" height="492" alt="image" src="https://github.com/user-attachments/assets/263ba66e-4ef9-4f36-ae38-99b80e96cde7" />
 
 安裝好之後會看到，這時什麼東西都沒有。
 
-<img width="1197" height="745" alt="image" src="https://github.com/user-attachments/assets/cc52221d-9667-4c5c-b545-a963bb421982" />
+<img width="711" height="443" alt="image" src="https://github.com/user-attachments/assets/cc52221d-9667-4c5c-b545-a963bb421982" />
 
 我們在上面搜尋欄搜尋n8n，對n8nio/n8n點選Pull。
 
-<img width="1204" height="957" alt="image" src="https://github.com/user-attachments/assets/b394609e-cd44-4d16-9f68-e7a572910936" />
+<img width="711" height="565" alt="image" src="https://github.com/user-attachments/assets/b394609e-cd44-4d16-9f68-e7a572910936" />
 
 下載完成之後，你會發現旁邊的最左側的images點進去之後，多了n8nio/n8n。
 
