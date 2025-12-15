@@ -213,7 +213,7 @@ n8n 採用了「流程圖」的概念。您在一個無限延伸的畫布上，�
 
 接下來到[Docker官網][docker_url]，選擇下載**Docker Desktop**，選**Windows \- AMD64。**
 
-<img width="1798" height="1181" alt="image" src="https://github.com/user-attachments/assets/62921ea6-d780-4738-880b-cd51ad9825f6" />
+<img width="711" height="467" alt="image" src="https://github.com/user-attachments/assets/62921ea6-d780-4738-880b-cd51ad9825f6" />
 
  [docker_url]: https://www.docker.com/
 
