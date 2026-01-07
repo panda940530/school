@@ -35,14 +35,6 @@ create index if not exists idx_projects_code on projects(project_code);
 create index if not exists idx_projects_unit_category on projects(unit_category);
 create index if not exists idx_projects_year on projects(extract(year from start_date));
 
--- 依執行單位(exec_unit)判別出的學院名稱
-alter table projects
-  add column if not exists college_category text;
-
--- 如果你會常用學院來 group by / 篩選，可以順便建 index
-create index if not exists idx_projects_college_category
-  on projects(college_category);
-
 -- 對照表：執行單位關鍵字 → 學院名稱
 create table if not exists college_map (
   id           bigserial primary key,
@@ -51,6 +43,9 @@ create table if not exists college_map (
   priority     int  not null default 100,
   created_at   timestamptz not null default now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_college_map_pattern_college
+  ON college_map (college_name, pattern);
 
 INSERT INTO college_map (pattern, college_name, priority) VALUES
 -- 法律學院
@@ -71,7 +66,6 @@ INSERT INTO college_map (pattern, college_name, priority) VALUES
 ('數位行銷進修學士學位學程','商學院',1),
 ('財務金融英語碩士學位學程','商學院',1),
 ('國際財務金融碩士在職專班','商學院',1),
-('比較法資料中心','商學院',1),
 ('電子商務研究中心','商學院',1),
 ('企業永續中心|企業永續發展研究中心','商學院',1),
 ('合作經濟暨非營利事業研究中心','商學院',1),
@@ -144,4 +138,17 @@ INSERT INTO college_map (pattern, college_name, priority) VALUES
 ('主計室|第一組|第二組','行政單位',1),
 ('資訊中心|作業組|系統組|行政及諮詢組|研究發展組','行政單位',1),
 ('進修暨推廣部|進修教育組|推廣教育組|行政管理組','行政單位',1),
-('校友中心|策劃組|活動組|服務組|學術組','行政單位',1);
+('校友中心|策劃組|活動組|服務組|學術組','行政單位',1)
+ON CONFLICT (college_name, pattern)
+DO UPDATE SET
+  priority = EXCLUDED.priority;
+
+CREATE TABLE IF NOT EXISTS project_college_link (
+  project_id   bigint REFERENCES projects(id) ON DELETE CASCADE,
+  college_name text NOT NULL,
+  PRIMARY KEY (project_id, college_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pcl_college_name
+  ON project_college_link (college_name);
+  

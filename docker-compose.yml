@@ -10,7 +10,7 @@ services:
       #預設資料庫名稱:db
       - POSTGRES_PASSWORD=school  # 你自己的密碼（記得改掉）
     volumes:
-      - db_data:/var/lib/postgresql
+      - db_data:/var/lib/postgresql/data #- db_data:/var/lib/postgresql
       - ./initdb:/docker-entrypoint-initdb.d   # ★ 這裡放 schema
     ports:
       - "5432:5432"                    # 如果只給容器用，可以拿掉這行

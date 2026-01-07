@@ -142,7 +142,7 @@ def upload():
         "spent_amount": "實支數",
         "refund_amount_raw": "餘額繳回",
         "manage_fee": "管理費",
-        "college_category": "學院",
+        "college_name": "學院",
         "approve_year": "核定年度",
         "duration_days": "計畫期間天數",
         "project_count": "計畫件數",

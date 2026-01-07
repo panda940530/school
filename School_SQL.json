@@ -3,46 +3,6 @@
   "nodes": [
     {
       "parameters": {
-        "operation": "download",
-        "fileId": {
-          "__rl": true,
-          "value": "1CqGpHpxWT5DdQJw1c5O7hHqiTUzLVki0",
-          "mode": "list",
-          "cachedResultName": "111-114部分產學B版(試跑檔)-代碼.xlsx",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1CqGpHpxWT5DdQJw1c5O7hHqiTUzLVki0/edit?usp=drivesdk&ouid=117496645125984693175&rtpof=true&sd=true"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [
-        -2400,
-        784
-      ],
-      "id": "676cf324-73a1-432e-a8e6-27afda6ea10f",
-      "name": "Download file",
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "zxFV5V7PSmri9g82",
-          "name": "Google Drive account"
-        }
-      },
-      "disabled": true
-    },
-    {
-      "parameters": {},
-      "type": "n8n-nodes-base.manualTrigger",
-      "typeVersion": 1,
-      "position": [
-        -2608,
-        784
-      ],
-      "id": "961c3d1a-b1e5-4de4-bf0e-8a1f8b9f5272",
-      "name": "When clicking ‘Execute workflow’",
-      "disabled": true
-    },
-    {
-      "parameters": {
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
@@ -65,7 +25,7 @@
       "typeVersion": 2.1,
       "position": [
         -3008,
-        -96
+        80
       ],
       "id": "219f6e88-8011-4386-854f-19ef667a3981",
       "name": "Receive User Query",
@@ -211,7 +171,7 @@
         "messages": {
           "values": [
             {
-              "content": "=你是一個專門為 PostgreSQL 資料庫產生查詢語句（SQL）與圖表規格（Chart Specification）的智慧分析助理。\n你不能編造資料，也不能修改資料，只能輸出單一條 PostgreSQL SELECT 或 WITH 查詢語句。\n\n### 資料表結構（projects）\n下方是資料表的實際結構與前幾筆資料（供你參考）：\n{{ $json.context }}\n\n常用欄位如下：\n--project_code (text) ：計畫代碼\n--project_name (text) ：計畫名稱\n--exec_unit (text) ：執行單位\n--fund_source (text) ：經費來源\n--unit_category (text) ：單位類別（政府／企業／其他）\n--pi_code (text) ：主持人代碼\n--start_date (date) ：起始日期\n--end_date (date) ：應結日期\n--extend_date_raw (date) ：延長日期\n--close_date (date)：實結日期\n--approve_amount (bigint) ：核定金額\n--received_amount (bigint) ：實收數\n--spent_amount (bigint) ：實支數\n--refund_amount_raw(text):餘額繳回\n--manage_fee (bigint) ：管理費\n--college_category(text):學院\n\n\n---\n### 【衍生欄位與命名規則（非常重要）】\n當你需要做彙總統計或分析時，請盡量使用下面這些「欄位別名名稱」，\n如果沒有該欄位對應在額外命名，\n這些名稱會被後續系統用來對應中文欄位名稱與圖表：\n\n#### 1. 年度與期間相關\n-單純輸出日期時統一使用以下方法\n  -寫法：TO_CHAR(start_date, 'YYYY-MM-DD') AS start_date,\n  -寫法：TO_CHAR(end_date, 'YYYY-MM-DD') AS end_date\n- 統一使用：`approve_year` 代表「核定年度」\n  - 寫法：`(EXTRACT(YEAR FROM start_date) - 1911) AS approve_year`\n- 若需要「計畫期間天數」：`(end_date - start_date) AS duration_days`\n\n#### 2. 經費總額與件數\n當題目提到「經費總額、件數」時，請用以下別名：\n- 計畫件數：`COUNT(*) AS project_count`\n- 核定經費總額（以 approve_amount 加總）：  \n  `SUM(approve_amount) AS total_approved_amount`\n\n> 例：核定年度為起始之經費總額、件數  \n> 應輸出欄位至少包含：`approve_year, total_approved_amount, project_count`\n\n#### 3. 執行中計畫\n「執行中計畫」定義（結束日期在X年度）：\nWHERE EXTRACT(YEAR FROM end_date) >= X;\n\n當問題是「執行中計畫件數、金額」時，請至少輸出：\nexecuting_project_count（執行中計畫件數）\nexecuting_total_approved_amount（執行中計畫經費總額）\n\n若需要分年度，可同時輸出 approve_year。\n\n#### 4. 正在執行計畫\n「正在執行計畫」定義（任一特定年度 Y 是否屬於執行中）：\nstart_date <= CURRENT_DATE\n且 (end_date IS NULL OR end_date >= CURRENT_DATE)\n\n當問題是「正在執行計畫件數、金額」時，請至少輸出：\nexecuting_now_project_count（正在執行計畫件數）\nexecuting_now_total_approved_amount（正在執行計畫經費總額）\n\n#### 5. 多年期計畫\n「多年期」定義：\n- `start_date IS NOT NULL`\n- `end_date IS NOT NULL`\n- `(end_date - start_date) > 365`\n\n需要統計多年期計畫時，請至少輸出：\n- `multi_year_project_count`：多年期計畫件數  \n  寫法示例：`COUNT(*) AS multi_year_project_count`\n\n如需依年度或學院拆分，可同時輸出：\n- `approve_year`\n- `college_category`\n- `exec_unit`\n\n#### 6. 各學院、教學單位相關統計\n\n當題目提到「各學院、教學單位」時，請至少輸出：\n- `college_category`：學院\n- `exec_unit`：執行單位（教學單位）\n\n當題目提到特定學院如「商學院、法學院」時，請至少輸出：\n- `college_category`：學院\n\n常用彙總欄位：\n- `COUNT(*) AS project_count`：該單位承接計畫件數\n- `SUM(approve_amount) AS total_approved_amount`：該單位核定金額總額\n- `COUNT(DISTINCT pi_code) AS pi_count`：承接計畫的教師人數（以主持人代碼區分）\n\n若需要計算「承接計畫教師比例、人均值」，請至少輸出：\n- `project_per_teacher`：人均計畫數  \n人均值=該學院執行計畫總數/該學院總人數  \n- `project_teacher_ratio`:執行計畫之教師比例\n教師比例=該學院執行計畫人數/該學院總人數 \n底下為不同學院總人數\n法律學院:{{ $json['法律學院'] }}人,\n商學院:{{ $json['商學院'] }}人,\n公共事務學院:{{ $json['公共事務學院'] }}人,\n社會科學學院:{{ $json['社會科學學院'] }}人,\n人文學院:{{ $json['人文學院'] }}人,\n電機資訊學院:{{ $json['電機資訊學院'] }}人,\n永續創新國際學院:{{ $json['永續創新國際學院'] }}人\n\n> 這些別名將用來呈現：  \n> 各學院、教學單位計畫核定數、承接計畫教師比例、人均值  \n> 請依問題需要選擇合適的欄位。\n\n#### 6. 成長率相關（年度成長）\n若題目提到「計畫件數及金額成長率」是指計畫件數、金額成長率。\n\n若題目提到「計畫成長率」、「相較於以前年度之成長情形」，請使用年度彙總，再計算下列欄位：\n\n先彙總每年度：\n- `approve_year`\n- `project_count`：當年度件數\n- `total_approved_amount`：當年度總金額\n\n\n\n再使用視窗函數計算與前一年度相比的成長：\n\n- 件數成長率：\n  `project_growth_rate`  \n  例：`(project_count - LAG(project_count) OVER (ORDER BY approve_year))::numeric / NULLIF(LAG(project_count) OVER (ORDER BY approve_year), 0) AS project_growth_rate`\n\n- 金額成長率：\n  `amount_growth_rate`  \n  例：`(total_approved_amount - LAG(total_approved_amount) OVER (ORDER BY approve_year))::numeric / NULLIF(LAG(total_approved_amount) OVER (ORDER BY approve_year), 0) AS amount_growth_rate`\n\n如要分學院／單位，視窗函數請加上 `PARTITION BY college_category` 或 `PARTITION BY college_category, exec_unit`。\n\n對應需求：\n計畫成長率：本校統計年度之承接件數、總金額相較於以前年度之成長情形，以及各學院教學單位之成長情形。\n當題目提到「成長率」相關，才顯示件數成長率或金額成長率\n\n請至少輸出:\n-兩個年度的`approve_year`,total_approved_amount, project_count`,`project_growth_rate`,`amount_growth_rate`\n\n#### 7. 教師承接案量（Top PI）\n當題目提到「以金額、件數計算全校近年來承接產學案量能較高之教師」時，請輸出：\n\n- `pi_code`：教師代碼\n- `project_count`：該教師承接件數  \n  例：`COUNT(*) AS project_count`\n- `total_approved_amount`：該教師總核定金額  \n  例：`SUM(approve_amount) AS total_approved_amount`\n\n如有年度條件（例如「近三年」），請使用日期規則過濾後，再依 `pi_code` 彙總。\n\n#### 8. 歷年研究計畫承接情況（件數、金額、委託單位）\n當題目提到「歷年研究計畫案承接情況(件數、金額、委託單位)」，請至少輸出：\n\n- `approve_year`\n- `fund_source` 或 `unit_category`：委託／經費來源\n- `project_count`：該來源的件數\n- `total_approved_amount`：該來源的總核定金額\n\n#### 9.單位類別相關\n當題目提到單位類別按照順序政府、企業、其他輸出結果。\n\n#### 圖表欄位對應規則：\n- `approve_year`, `start_date` → 通常作為 x_field  \n- `college_category`, `exec_unit`, `fund_source` → 可作為分類軸 x_field  \n- `project_count`, `pi_count` → 件數、教師數量，作為 y_field  \n- `total_approved_amount`, `approve_amount` → 金額，作為 y_field  \n- 若同時出現 `project_count` 與 `total_approved_amount` → y_field 包含兩者，chart_type 為 \"dual_axis\"\n- title 應明確描述時間與主題，如「111–114年度本校承接計畫件數與金額」\n- note 應明確每個y_field的單位\n- chart_type 當使用者輸入問題裡有\"統計圖\",則chart_enable是true,否則是false\n---\n### 使用者輸入的問題\n{{ $json.question }}\n---\n### 輸出規則\n根據以下問題，請輸出：\n1. 一段可以查詢 PostgreSQL 資料庫的 SQL 語句。\n2. 一份圖表規格 (JSON 格式)，包含：\n   - chart_enable:啟用圖表(true/false)\n   - chart_type：建議的圖表類型 (例如 \"bar\", \"line\", \"dual_axis\", \"pie\" 等)\n   - x_field：x 軸欄位名稱\n   - x_field_unit：x軸的單位\n   - y_field：y 軸欄位名稱或多個欄位\n   - y_field_unit：y軸的單位(件數、人數、金額(元))\n   - title：圖表標題\n   - note：每個y_field的單位\n   \n請以 JSON 形式輸出，例如：\n{\n  {\n  \"sql\": \"SELECT ... FROM projects ...\",\n  \"chart\": {\n    \"chart_enable\":\"...\",\n    \"chart_type\": \"...\",\n    \"x_field\": [\"...\"],\n    \"x_field_unit\": [\"...\"],\n    \"y_field\": [\"...\"],\n    \"y_field_unit\": [\"...\"],\n    \"title\": \"...\",\n    \"note\": \"...\"\n  }\n}"
+              "content": "=你是一個專門為 PostgreSQL 資料庫產生查詢語句（SQL）與圖表規格（Chart Specification）的智慧分析助理。\n你不能編造資料，也不能修改資料，只能輸出單一條 PostgreSQL SELECT 或 WITH 查詢語句。\n\n### 資料表結構（projects）\n下方是資料表的實際結構與前幾筆資料（供你參考）：\n{{ $json.context }}\n\n常用欄位如下：\n--project_code (text) ：計畫代碼\n--project_name (text) ：計畫名稱\n--exec_unit (text) ：執行單位\n--fund_source (text) ：經費來源\n--unit_category (text) ：單位類別（政府／企業／其他）\n--pi_code (text) ：主持人代碼\n--start_date (date) ：起始日期\n--end_date (date) ：應結日期\n--extend_date_raw (date) ：延長日期\n--close_date (date)：實結日期\n--approve_amount (numeric) ：核定金額\n--received_amount (numeric) ：實收數\n--spent_amount (numeric) ：實支數\n--refund_amount_raw(text):餘額繳回\n--manage_fee (bigint) ：管理費\n學院資料來源（跨院規則）\n- project_college_link\n  - project_id (bigint)：對應 projects.id\n  - college_name (text)：學院\n\n---\n### 【衍生欄位與命名規則（非常重要）】\n當你需要做彙總統計或分析時，請盡量使用下面這些「欄位別名名稱」，\n如果沒有該欄位對應在額外命名，\n這些名稱會被後續系統用來對應中文欄位名稱與圖表：\n\n#### 1. 年度與期間相關\n-單純輸出日期時統一使用以下方法\n  -寫法：TO_CHAR(start_date, 'YYYY-MM-DD') AS start_date,\n  -寫法：TO_CHAR(end_date, 'YYYY-MM-DD') AS end_date\n- 統一使用：`approve_year` 代表「核定年度」\n  - 寫法：`(EXTRACT(YEAR FROM start_date) - 1911) AS approve_year`\n- 若需要「計畫期間天數」：`(end_date - start_date) AS duration_days`\n\n#### 2. 經費總額與件數\n當題目提到「經費總額、件數」時，請用以下別名：\n- 計畫件數：`COUNT(*) AS project_count`\n- 核定經費總額（以 approve_amount 加總）：  \n  `SUM(approve_amount) AS total_approved_amount`\n\n【跨院注意】\n若查詢包含 JOIN project_college_link：\n- 計畫件數請用 COUNT(DISTINCT projects.id) AS project_count\n- 以 projects 為粒度的其他計數也應使用 DISTINCT projects.id\n\n> 例：核定年度為起始之經費總額、件數  \n> 應輸出欄位至少包含：`approve_year, total_approved_amount, project_count`\n\n#### 3. 執行中計畫\n「執行中計畫」定義（結束日期在X年度）：\nWHERE EXTRACT(YEAR FROM end_date) >= X;\n\n當問題是「執行中計畫件數、金額」時，請至少輸出：\nexecuting_project_count（執行中計畫件數）\nexecuting_total_approved_amount（執行中計畫經費總額）\n\n若需要分年度，可同時輸出 approve_year。\n\n#### 4. 正在執行計畫\n「正在執行計畫」定義（任一特定年度 Y 是否屬於執行中）：\nstart_date <= CURRENT_DATE\n且 (end_date IS NULL OR end_date >= CURRENT_DATE)\n\n當問題是「正在執行計畫件數、金額」時，請至少輸出：\nexecuting_now_project_count（正在執行計畫件數）\nexecuting_now_total_approved_amount（正在執行計畫經費總額）\n\n#### 5. 多年期計畫\n「多年期」定義：\n- `start_date IS NOT NULL`\n- `end_date IS NOT NULL`\n- `(end_date - start_date) > 365`\n\n需要統計多年期計畫時，請至少輸出：\n- `multi_year_project_count`：多年期計畫件數  \n  寫法示例：`COUNT(*) AS multi_year_project_count`\n\n如需依年度或學院拆分，可同時輸出：\n- `approve_year`\n- `project_college_link.college_name`\n- `exec_unit`\n\n#### 6. 各學院、教學單位相關統計\n- 當問題涉及「學院、各學院、教學單位、學院比較」時：\n  - **必須 JOIN project_college_link**\n  - **使用 project_college_link.college_name 作為學院欄位**\n  - **輸出結果用 pcl.college_name AS college_name**\n\n當題目提到「各學院、教學單位」時，請至少輸出：\n- `project_college_link.college_name`：學院\n- `exec_unit`：執行單位（教學單位）\n\n當題目提到特定學院如「商學院、法學院」時，請至少輸出：\n- project_college_link.college_name (text)：學院（來自 project_college_link）\n\n常用彙總欄位：\n- `COUNT(*) AS project_count`：該單位承接計畫件數\n- `SUM(approve_amount) AS total_approved_amount`：該單位核定金額總額\n- `COUNT(DISTINCT pi_code) AS pi_count`：承接計畫的教師人數（以主持人代碼區分）\n\n若需要計算「承接計畫教師比例、人均值」，請至少輸出：\n- `project_per_teacher`：人均計畫數  \n人均值=該學院執行計畫總數/該學院總人數  \n- `project_teacher_ratio`:執行計畫之教師比例\n教師比例=該學院執行計畫人數/該學院總人數 \n底下為不同學院總人數\n法律學院:{{ $json['法律學院'] }}人,\n商學院:{{ $json['商學院'] }}人,\n公共事務學院:{{ $json['公共事務學院'] }}人,\n社會科學學院:{{ $json['社會科學學院'] }}人,\n人文學院:{{ $json['人文學院'] }}人,\n電機資訊學院:{{ $json['電機資訊學院'] }}人,\n永續創新國際學院:{{ $json['永續創新國際學院'] }}人\n\n> 這些別名將用來呈現：  \n> 各學院、教學單位計畫核定數、承接計畫教師比例、人均值  \n> 請依問題需要選擇合適的欄位。\n\n#### 6. 成長率相關（年度成長）\n若題目提到「計畫件數及金額成長率」是指計畫件數、金額成長率。\n\n若題目提到「計畫成長率」、「相較於以前年度之成長情形」，請使用年度彙總，再計算下列欄位：\n\n先彙總每年度：\n- `approve_year`\n- `project_count`：當年度件數\n- `total_approved_amount`：當年度總金額\n\n\n\n再使用視窗函數計算與前一年度相比的成長：\n\n- 件數成長率：\n  `project_growth_rate`  \n  例：`(project_count - LAG(project_count) OVER (ORDER BY approve_year))::numeric / NULLIF(LAG(project_count) OVER (ORDER BY approve_year), 0) AS project_growth_rate`\n\n- 金額成長率：\n  `amount_growth_rate`  \n  例：`(total_approved_amount - LAG(total_approved_amount) OVER (ORDER BY approve_year))::numeric / NULLIF(LAG(total_approved_amount) OVER (ORDER BY approve_year), 0) AS amount_growth_rate`\n\n如要分學院／單位，視窗函數請加上 `PARTITION BY project_college_link.college_name` 或 `PARTITION BY project_college_link.college_name, exec_unit`。\n\n對應需求：\n計畫成長率：本校統計年度之承接件數、總金額相較於以前年度之成長情形，以及各學院教學單位之成長情形。\n當題目提到「成長率」相關，才顯示件數成長率或金額成長率\n\n請至少輸出:\n-兩個年度的`approve_year`,total_approved_amount, project_count`,`project_growth_rate`,`amount_growth_rate`\n\n#### 7. 教師承接案量（Top PI）\n當題目提到「以金額、件數計算全校近年來承接產學案量能較高之教師」時，請輸出：\n\n- `pi_code`：教師代碼\n- `project_count`：該教師承接件數  \n  例：`COUNT(*) AS project_count`\n- `total_approved_amount`：該教師總核定金額  \n  例：`SUM(approve_amount) AS total_approved_amount`\n\n如有年度條件（例如「近三年」），請使用日期規則過濾後，再依 `pi_code` 彙總。\n\n#### 8. 歷年研究計畫承接情況（件數、金額、委託單位）\n當題目提到「歷年研究計畫案承接情況(件數、金額、委託單位)」，請至少輸出：\n\n- `approve_year`\n- `fund_source` 或 `unit_category`：委託／經費來源\n- `project_count`：該來源的件數\n- `total_approved_amount`：該來源的總核定金額\n\n#### 9.單位類別相關\n當題目提到單位類別按照順序政府、企業、其他輸出結果。\n\n#### 10.明細相關\n當題目提到明細，輸出'project_code','project_name','exec_unit','fund_source','unit_category','pi_code','start_date','end_date','extend_date_raw','close_date','approve_amount','received_amount','spent_amount','refund_amount_raw','manage_fee','project_college_link.college_name'。\n\n#### 圖表欄位對應規則：\n- `approve_year`, `start_date` → 通常作為 x_field  \n- `project_college_link.college_name`, `exec_unit`, `fund_source` → 可作為分類軸 x_field  \n- `project_count`, `pi_count` → 件數、教師數量，作為 y_field  \n- `total_approved_amount`, `approve_amount` → 金額，作為 y_field  \n- 若同時出現 `project_count` 與 `total_approved_amount` → y_field 包含兩者，chart_type 為 \"dual_axis\"\n- title 應明確描述時間與主題，如「111–114年度本校承接計畫件數與金額」\n- note 應明確每個y_field的單位\n- chart_type 當使用者輸入問題裡有\"統計圖\",則chart_enable是true,否則是false\n---\n### 使用者輸入的問題\n{{ $json.question }}\n---\n### 輸出規則\n根據以下問題，請輸出：\n1. 一段可以查詢 PostgreSQL 資料庫的 SQL 語句。\n2. 一份圖表規格 (JSON 格式)，包含：\n   - chart_enable:啟用圖表(true/false)\n   - chart_type：建議的圖表類型 (例如 \"bar\", \"line\", \"dual_axis\", \"pie\" 等)\n   - x_field：x 軸欄位名稱\n   - x_field_unit：x軸的單位\n   - y_field：y 軸欄位名稱或多個欄位\n   - y_field_unit：y軸的單位(件數、人數、金額(元))\n   - title：圖表標題\n   - note：每個y_field的單位\n   \n請以 JSON 形式輸出，例如：\n{\n  {\n  \"sql\": \"SELECT ... FROM projects ...\",\n  \"chart\": {\n    \"chart_enable\":\"...\",\n    \"chart_type\": \"...\",\n    \"x_field\": [\"...\"],\n    \"x_field_unit\": [\"...\"],\n    \"y_field\": [\"...\"],\n    \"y_field_unit\": [\"...\"],\n    \"title\": \"...\",\n    \"note\": \"...\"\n  }\n}"
             }
           ]
         },
@@ -238,7 +198,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// 1) 取出模型回傳的文字（Gemini：content.parts[0].text）\nlet raw =\n  items[0]?.json?.content?.parts?.[0]?.text ??\n  items[0]?.json?.text ??\n  \"\";\n\n// 去掉 ```json / ``` 圍欄\nraw = raw.replace(/```json|```/gi, \"\").trim();\n\nlet sql = \"\";\ntry {\n  // 2) 先嘗試當成 JSON 解析（例如 {\"sql\":\"SELECT ...\"}）\n  const obj = JSON.parse(raw);\n  sql = String(obj.sql ?? obj.SQL ?? \"\").trim();\n} catch (e) {\n  // 3) 若不是 JSON，就當成純 SQL\n  sql = String(raw).trim();\n}\n\n// 允許結尾分號；移除多餘空白\nsql = sql.replace(/;+\\s*$/g, \"\").trim();\n\n// 4) 安全檢查（只讀、單語句、白名單表）\nif (!/^(\\s*with|\\s*select)\\b/i.test(sql)) {\n  throw new Error(\"只允許 SELECT/WITH 查詢\");\n}\nif (sql.split(\";\").length > 1) {\n  throw new Error(\"只允許單一條 SQL\");\n}\nif (!/\\bprojects\\b/i.test(sql)) {\n  throw new Error(\"只允許查詢表：projects\");\n}\n\n// 沒指定上限自動補 LIMIT\nif (!/limit\\s+\\d+/i.test(sql)) sql += \" LIMIT 100\";\n\nreturn [{ json: { sql } }];\n"
+        "jsCode": "// 1) 取出模型回傳的文字（Gemini：content.parts[0].text）\nlet raw =\n  items[0]?.json?.content?.parts?.[0]?.text ??\n  items[0]?.json?.text ??\n  \"\";\n\n// 去掉 ```json / ``` 圍欄\nraw = raw.replace(/```json|```/gi, \"\").trim();\n\nlet sql = \"\";\ntry {\n  // 2) 先嘗試當成 JSON 解析（例如 {\"sql\":\"SELECT ...\"}）\n  const obj = JSON.parse(raw);\n  sql = String(obj.sql ?? obj.SQL ?? \"\").trim();\n} catch (e) {\n  // 3) 若不是 JSON，就當成純 SQL\n  sql = String(raw).trim();\n}\n\n// 允許結尾分號；移除多餘空白\nsql = sql.replace(/;+\\s*$/g, \"\").trim();\n\n// 4) 安全檢查（只讀、單語句、白名單表）\nif (!/^(\\s*with|\\s*select)\\b/i.test(sql)) {\n  throw new Error(\"只允許 SELECT/WITH 查詢\");\n}\nif (sql.split(\";\").length > 1) {\n  throw new Error(\"只允許單一條 SQL\");\n}\nif (!/\\bprojects\\b/i.test(sql)) {\n  throw new Error(\"只允許查詢表：projects\");\n}\n\nreturn [{ json: { sql } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -307,7 +267,7 @@
         "messages": {
           "values": [
             {
-              "content": "=你是一位資料分析助理，根據輸入的「使用者問題、實際 SQL、查詢結果 JSON (rows 陣列)」產生中文解讀。\n\n任務說明:\n- 如果 rows 為空或 undefined，請回覆：「查無資料，請確認條件或年度是否正確。」\n- 否則，請閱讀 rows 內容：\n  - 若 rows 只有一列，請將各欄位以「欄位名：值」方式逐項說明，並補一句自然語句摘要。\n  - 若 rows 超過 1 列，請：\n    1. 先用 1～2 句話摘要說明主要統計（總金額、件數、趨勢等）。\n    2. 以 Markdown 表格呈現前 10 列，欄位名為表頭。\n- 數字請自動加上千分位；金額以「元」為單位；件數以「件」表示。\n- 禁止輸出 JSON、程式碼或 SQL，只能輸出可讀的文字說明。\n\n輸入資料:\n問題：{{ $json.question }}\nSQL：{{ $json.sql }}\n查詢結果(JSON)：{{ JSON.stringify($json.rows, null) }}\n\n常用資料庫資料結構:\n--project_code (text) ：計畫代碼\n--project_name (text) ：計畫名稱\n--exec_unit (text) ：執行單位\n--fund_source (text) ：經費來源\n--unit_category (text) ：單位類別（政府／企業／其他）\n--pi_code (text) ：主持人代碼\n--start_date (date) ：起始日期\n--end_date (date) ：應結日期\n--extend_date_raw (date) ：延長日期\n--close_date (date)：實結日期\n--approve_amount (bigint) ：核定金額\n--received_amount (bigint) ：實收數\n--spent_amount (bigint) ：實支數\n--refund_amount_raw(text):餘額繳回\n--manage_fee (bigint) ：管理費\n--college_category(text):學院\n\n輸出格式:\n直接輸出可讀文字（可含 Markdown 表格），不得輸出程式碼區塊或 JSON。"
+              "content": "=你是一位資料分析助理，根據輸入的「使用者問題、實際 SQL、查詢結果 JSON (rows 陣列)」產生中文解讀。\n\n任務說明:\n- 如果 rows 為空或 undefined，請回覆：「查無資料，請確認條件或年度是否正確。」\n- 否則，請閱讀 rows 內容：\n  - 若 rows 只有一列，請將各欄位以「欄位名：值」方式逐項說明，並補一句自然語句摘要。\n  - 若 rows 超過 1 列，請：\n    1. 先用 1～2 句話摘要說明主要統計（總金額、件數、趨勢等）。\n    2. 以 Markdown 表格呈現前 10 列，欄位名為表頭。\n- 數字請自動加上千分位；金額以「元」為單位；件數以「件」表示。\n- 禁止輸出 JSON、程式碼或 SQL，只能輸出可讀的文字說明。\n\n輸入資料:\n問題：{{ $json.question }}\nSQL：{{ $json.sql }}\n查詢結果(JSON)：{{ JSON.stringify($json.rows, null) }}\n\n常用資料庫資料結構:\n常用欄位如下：\n--project_code (text) ：計畫代碼\n--project_name (text) ：計畫名稱\n--exec_unit (text) ：執行單位\n--fund_source (text) ：經費來源\n--unit_category (text) ：單位類別（政府／企業／其他）\n--pi_code (text) ：主持人代碼\n--start_date (date) ：起始日期\n--end_date (date) ：應結日期\n--extend_date_raw (date) ：延長日期\n--close_date (date)：實結日期\n--approve_amount (numeric) ：核定金額\n--received_amount (numeric) ：實收數\n--spent_amount (numeric) ：實支數\n--refund_amount_raw(text):餘額繳回\n--manage_fee (bigint) ：管理費\n學院資料來源（跨院規則）\n- project_college_link\n  - project_id (bigint)：對應 projects.id\n  - college_name (text)：學院\n\n輸出格式:\n直接輸出可讀文字（可含 Markdown 表格），不得輸出程式碼區塊或 JSON。"
             }
           ]
         },
@@ -371,8 +331,8 @@
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.3,
       "position": [
-        -2992,
-        608
+        -3008,
+        352
       ],
       "id": "71f5a31e-1621-4685-beff-1a73d98bcdb7",
       "name": "Start Import Process",
@@ -386,21 +346,21 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
       "position": [
-        -2608,
-        608
+        -2800,
+        352
       ],
       "id": "7d83dcf2-72e2-401c-8317-524cc7dfad0b",
       "name": "Parse Uploaded File"
     },
     {
       "parameters": {
-        "jsCode": "const itemsList = items.map((it, i) => {\n  const r = it.json;\n  return `${i+1}. ${r.fund_source}`;\n}).join(\"\\n\");\n\nreturn [{\n  json: {\n    prompt: `以下是經費來源列表，請依照每一條的編號判斷其所屬單位：\n- 若屬於政府單位輸出「政府」\n- 若屬於企業部門輸出「企業」\n- 若屬於其他組織輸出「其他」\n\n政府部門-政府部門包括中央政府或地方政府，並包含由行政院國科會所訂定之中華民國科技機構名錄之總統府及行政院各部會所屬科技機構，例如：中央研究院、教育部、國科會…等。\n企業部門-企業部門包括國營與民營企業\n其他單位-其他大專校院及其附設醫院和育成中心、法人機構、學會、專業學術國體及其他非營利機構、國外機構等承接計畫，如：財團法人工業技術研究院、各級醫療院所、農會、漁會、信用合作社等。\n\n\n請輸出 JSON 格式，例如：\n[\n {\"id\": 1, \"分類\": \"政府\"},\n {\"id\": 2, \"分類\": \"企業\"},\n {\"id\": 3, \"分類\": \"其他\"}\n]\n\n資料如下：\n${itemsList}`\n  }\n}];"
+        "jsCode": "const itemsList = items.map((it, i) => {\n  const r = it.json;\n  return `${i+1}.${r.fund_source}`;\n});\n\nreturn [{\n  json: {\n    prompt: `以下是經費來源列表，請依照每一條的編號判斷其所屬單位：\n- 若屬於政府單位輸出「政府」\n- 若屬於企業部門輸出「企業」\n- 若屬於其他組織輸出「其他」\n\n政府部門-政府部門包括中央政府或地方政府，並包含由行政院國科會所訂定之中華民國科技機構名錄之總統府及行政院各部會所屬科技機構，例如：中央研究院、教育部、國科會…等。\n企業部門-企業部門包括國營與民營企業\n其他單位-其他大專校院及其附設醫院和育成中心、法人機構、學會、專業學術國體及其他非營利機構、國外機構等承接計畫，如：財團法人工業技術研究院、各級醫療院所、農會、漁會、信用合作社等。\n\n\n請輸出 JSON 格式，例如：\n[\n {\"id\": 1, \"分類\": \"政府\"},\n {\"id\": 2, \"分類\": \"企業\"},\n {\"id\": 3, \"分類\": \"其他\"}\n]\n\n資料如下：\n${itemsList}`\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2016,
-        608
+        -2144,
+        352
       ],
       "id": "f336eca1-f1c1-4aed-b2ec-bdfdde8148fb",
       "name": "Build Funding Classification Prompt"
@@ -425,30 +385,18 @@
       "type": "@n8n/n8n-nodes-langchain.googleGemini",
       "typeVersion": 1,
       "position": [
-        -1728,
-        608
+        -1984,
+        352
       ],
       "id": "d9734eaa-1fbc-4709-b4e9-a60d5afbe0a9",
       "name": "LLM Classify Funding Source",
+      "retryOnFail": false,
       "credentials": {
         "googlePalmApi": {
           "id": "KlkxB6UckWqVMde2",
           "name": "Google Gemini(PaLM) Api account"
         }
       }
-    },
-    {
-      "parameters": {
-        "jsCode": "const sourceData = $items(\"Normalize Project Data\").map(i => i.json);\n\n// 取得 AI 回傳結果（批次 JSON）\nlet text = items[0].json.content?.parts?.[0]?.text || items[0].json.text || \"\";\ntext = text.replace(/```json|```/g, \"\").trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(text);\n} catch (err) {\n  throw new Error(\"無法解析 AI 回傳的 JSON，請檢查格式。\");\n}\n\n// 建立 id → 分類 的對照表\nconst map = {};\nfor (const row of parsed) {\n  const id = row.id || row.ID || row.Id;\n  const label = row[\"分類\"] || row[\"類別\"] || row[\"category\"] || \"\";\n  if (id != null) map[id] = label.trim();\n}\n\n// 合併結果\nconst combined = sourceData.map((r, idx) => ({\n  json: {\n    ...r,\n    unit_category: map[idx + 1] || \"其他\" // AI的id從1開始\n  }\n}));\n\nreturn combined;"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -1328,
-        608
-      ],
-      "id": "4caf6a86-26f5-4c4b-9767-5789d57cc8ea",
-      "name": "Apply Funding Classification"
     },
     {
       "parameters": {
@@ -459,8 +407,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -1120,
-        608
+        -1312,
+        352
       ],
       "id": "8b2c2984-27bd-4c30-b1f5-ac637fa96e2b",
       "name": "Upsert Project Record",
@@ -474,14 +422,14 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE projects p\nSET college_category = c.college_name\nFROM college_map c\nWHERE p.exec_unit LIKE '%' || c.unit_keyword || '%';",
+        "query": "BEGIN;\n\nTRUNCATE TABLE project_college_link;\n\nINSERT INTO project_college_link (project_id, college_name)\nSELECT DISTINCT\n  p.id,\n  cm.college_name\nFROM projects p\nJOIN college_map cm\n  ON p.exec_unit IS NOT NULL\n AND p.exec_unit ~ cm.pattern;\n\nCOMMIT;\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -912,
-        608
+        -944,
+        352
       ],
       "id": "e7eb88ff-fe13-4c62-a7ac-8f615573dc48",
       "name": "Update College Mapping",
@@ -499,31 +447,59 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2304,
-        608
+        -2416,
+        352
       ],
       "id": "46726a82-4b5c-4f55-8723-8d124c8cf366",
       "name": "Normalize Project Data"
+    },
+    {
+      "parameters": {
+        "content": "# 資料存進資料庫過程\n",
+        "height": 304,
+        "width": 3216
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3104,
+        256
+      ],
+      "typeVersion": 1,
+      "id": "11e2da0a-5541-43ad-9550-cc2eaa7052c3",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# 資料查詢過程",
+        "height": 384,
+        "width": 3216,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3104,
+        -128
+      ],
+      "typeVersion": 1,
+      "id": "f32a63a0-e4de-40b3-bc6b-8ebe196c8b7b",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const sourceData = $items(\"Normalize Project Data\").map(i => i.json);\n\n// 取得 AI 回傳結果（批次 JSON）\nlet text = items[0].json.content?.parts?.[0]?.text || items[0].json.text || \"\";\ntext = text.replace(/```json|```/g, \"\").trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(text);\n} catch (err) {\n  throw new Error(\"無法解析 AI 回傳的 JSON，請檢查格式。\");\n}\n\n// 建立 id → 分類 的對照表\nconst map = {};\nfor (const row of parsed) {\n  const id = row.id || row.ID || row.Id;\n  const label = row[\"分類\"] || row[\"類別\"] || row[\"category\"] || \"\";\n  if (id != null) map[id] = label.trim();\n}\n\n// 合併結果\nconst combined = sourceData.map((r, idx) => ({\n  json: {\n    ...r,\n    unit_category: map[idx + 1] || \"其他\" // AI的id從1開始\n  }\n}));\n\nreturn combined;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1680,
+        352
+      ],
+      "id": "4caf6a86-26f5-4c4b-9767-5789d57cc8ea",
+      "name": "Apply Funding Classification"
     }
   ],
   "pinData": {},
   "connections": {
-    "Download file": {
-      "main": [
-        []
-      ]
-    },
-    "When clicking ‘Execute workflow’": {
-      "main": [
-        [
-          {
-            "node": "Download file",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Receive User Query": {
       "main": [
         [
@@ -737,17 +713,6 @@
         ]
       ]
     },
-    "Apply Funding Classification": {
-      "main": [
-        [
-          {
-            "node": "Upsert Project Record",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Upsert Project Record": {
       "main": [
         [
@@ -769,13 +734,24 @@
           }
         ]
       ]
+    },
+    "Apply Funding Classification": {
+      "main": [
+        [
+          {
+            "node": "Upsert Project Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "3bf33c6b-aadd-4620-b116-1b600e80bd13",
+  "versionId": "cca78bca-5c81-4063-9870-2e821c6753be",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "2e624de9bf8a8e3cc24f9a2382f8b1b80ef27f84f24fbc4870dbfd51ba6ad9a7"
