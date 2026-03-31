@@ -1,0 +1,410 @@
+{
+  "name": "school_data",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const itemsList = items.map((it, i) => {\n  const r = it.json;\n  return `${i+1}.${r.fund_source}`;\n});\n\nreturn [{\n  json: {\n    prompt: `以下是經費來源列表，請依照每一條的編號判斷其所屬單位：\n- 若屬於政府單位輸出「政府」\n- 若屬於企業部門輸出「企業」\n- 若屬於其他組織輸出「其他」\n\n政府部門-政府部門包括中央政府或地方政府，並包含由行政院國科會所訂定之中華民國科技機構名錄之總統府及行政院各部會所屬科技機構，例如：中央研究院、教育部、國科會…等。\n企業部門-企業部門包括國營與民營企業\n其他單位-其他大專校院及其附設醫院和育成中心、法人機構、學會、專業學術國體及其他非營利機構、國外機構等承接計畫，如：財團法人工業技術研究院、各級醫療院所、農會、漁會、信用合作社等。\n\n\n請輸出 JSON 格式，例如：\n[\n {\"id\": 1, \"分類\": \"政府\"},\n {\"id\": 2, \"分類\": \"企業\"},\n {\"id\": 3, \"分類\": \"其他\"}\n]\n\n資料如下：\n${itemsList}`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        16
+      ],
+      "id": "c4ce9603-99c0-463b-a762-3267549d7e34",
+      "name": "Build Funding Classification Prompt"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{$json.prompt}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        16
+      ],
+      "id": "b588c6a8-2d59-4db9-941a-77b1a4deb122",
+      "name": "LLM Classify Funding Source",
+      "retryOnFail": false,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "KlkxB6UckWqVMde2",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into projects (\n  project_code, project_name, exec_unit, fund_source, unit_category,\n  pi_code, start_date, end_date, extend_date_raw, close_date,\n  approve_amount, received_amount, spent_amount, refund_amount_raw, manage_fee\n) values (\n  '{{$json.project_code}}',\n  '{{$json.project_name}}',\n  '{{$json.exec_unit}}',\n  '{{$json.fund_source}}',\n  '{{$json.unit_category}}',\n  '{{$json.pi_code}}',\n  {{$json.start_date ? `'${$json.start_date}'` : 'null'}},\n  {{$json.end_date ? `'${$json.end_date}'` : 'null'}},\n  {{$json.extend_date_raw ? \"'\" + $json.extend_date_raw.replaceAll(\"'\", \"''\") + \"'\" : 'null'}},\n  {{$json.close_date ? `'${$json.close_date}'` : 'null'}},\n  {{$json.approve_amount ?? 'null'}},\n  {{$json.received_amount ?? 'null'}},\n  {{$json.spent_amount ?? 'null'}},\n  '{{$json.refund_amount_raw}}',\n  {{$json.manage_fee ?? 'null'}}\n)\non conflict (project_code) do update set\n  project_name = excluded.project_name,\n  exec_unit = excluded.exec_unit,\n  fund_source = excluded.fund_source,\n  unit_category = excluded.unit_category,\n  pi_code = excluded.pi_code,\n  start_date = excluded.start_date,\n  end_date = excluded.end_date,\n  extend_date_raw = excluded.extend_date_raw,\n  close_date = excluded.close_date,\n  approve_amount = excluded.approve_amount,\n  received_amount = excluded.received_amount,\n  spent_amount = excluded.spent_amount,\n  refund_amount_raw = excluded.refund_amount_raw,\n  manage_fee = excluded.manage_fee;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1760,
+        256
+      ],
+      "id": "8d656891-c134-4196-98e7-afd77f01ed1c",
+      "name": "Upsert Project Record",
+      "credentials": {
+        "postgres": {
+          "id": "YrZYCBMuJXc0NucT",
+          "name": "local host"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\nTRUNCATE TABLE project_college_link;\n\nINSERT INTO project_college_link (project_id, college_name)\nSELECT DISTINCT\n  p.id,\n  cm.college_name\nFROM projects p\nJOIN college_map cm\n  ON p.exec_unit IS NOT NULL\n AND p.exec_unit ~ cm.pattern;\n\nCOMMIT;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2048,
+        256
+      ],
+      "id": "5b4ac268-9146-46e6-9e5b-0c4a8833813d",
+      "name": "Update College Mapping",
+      "credentials": {
+        "postgres": {
+          "id": "YrZYCBMuJXc0NucT",
+          "name": "local host"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let sourceData;\ntry {\n  sourceData = $items(\"If\").map(i => i.json);\n} catch (e) {\n  try {\n    sourceData = $items(\"Normalize Project Data\").map(i => i.json);\n  } catch (e2) {\n    sourceData = $items(\"Code in JavaScript\").map(i => i.json);\n  }\n}\n\nlet text = items[0].json.content?.parts?.[0]?.text || items[0].json.text || \"\";\ntext = text.replace(/```json|```/g, \"\").trim();\nlet parsed;\ntry {\n  parsed = JSON.parse(text);\n} catch (err) {\n  throw new Error(\"無法解析 AI 回傳的 JSON，請檢查格式。\");\n}\n\nconst map = {};\nfor (const row of parsed) {\n  const id = row.id || row.ID || row.Id;\n  const label = row[\"分類\"] || row[\"類別\"] || row[\"category\"] || \"\";\n  if (id != null) map[id] = label.trim();\n}\n\nconst combined = sourceData.map((r, idx) => ({\n  json: {\n    ...r,\n    unit_category: map[idx + 1] || \"其他\"\n  }\n}));\nreturn combined;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        16
+      ],
+      "id": "1faa89bf-0fc4-445f-b4f2-3c0900d5d598",
+      "name": "Apply Funding Classification"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM BUGETA_VIEW"
+      },
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1.1,
+      "position": [
+        288,
+        16
+      ],
+      "id": "19ca3863-7f6e-43d4-a252-fa1fb9358959",
+      "name": "Microsoft SQL",
+      "credentials": {
+        "microsoftSql": {
+          "id": "BL3Ov2fD89kjbln0",
+          "name": "Microsoft SQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const roc = (v) => {\n  if (!v || !v.trim()) return null;\n  const s = v.trim();\n  const y = parseInt(s.substring(0, 3)) + 1911;\n  const m = s.substring(3, 5);\n  const d = s.substring(5, 7);\n  return `${y}-${m}-${d}`;\n};\n\nconst N = (v) => {\n  const n = Number(v);\n  return isNaN(n) ? 0 : n;\n};\n\nreturn items.map(item => {\n  const r = item.json;\n  return {\n    json: {\n      project_code: r[\"BUGETNO\"]?.trim(),\n      project_name:      r[\"BUGNAME\"],\n      exec_unit:         r[\"DEPNAME\"],\n      fund_source:       r[\"PRODEPNAME\"],\n      pi_code:           r[\"LEADER\"],\n      start_date:        roc(r[\"START\"]),\n      end_date:          roc(r[\"DEADLINE\"]),\n      extend_date_raw:   roc(r[\"DELAY\"]),\n      close_date:        roc(r[\"CLOSED\"]),\n      approve_amount:    N(r[\"AMOUNT\"]),\n      received_amount:   N(r[\"INCOME\"]),\n      spent_amount:      N(r[\"EXPENSE\"]),\n      refund_amount_raw: r[\"RETURNAMOUNT\"],\n      manage_fee:        N(r[\"MANAGEAMOUNT\"]),\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        16
+      ],
+      "id": "8f2297fd-a4c2-451e-a913-73a9aac69dae",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        32,
+        16
+      ],
+      "id": "4ac374b3-6dce-476f-b363-1a5f6bff6f0d",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const dateOnly = (v) => {\n  if (!v) return \"\";\n  return String(v).substring(0, 10);\n};\n\nconst existing = {};\nfor (const i of $items(\"Fetch Existing Projects\")) {\n  existing[i.json.project_code?.trim()] = i.json;\n}\n\nconst incoming = $items(\"Code in JavaScript\").map(i => i.json);\n\nconst results = [];\n\nfor (const r of incoming) {\n  const code = r.project_code?.trim();\n  const old = existing[code];\n\n  if (!old) {\n    results.push({ json: { ...r, _route: \"new\" } });\n  } else if (\n    Number(old.approve_amount) !== Number(r.approve_amount) ||\n    Number(old.received_amount) !== Number(r.received_amount) ||\n    Number(old.spent_amount) !== Number(r.spent_amount) ||\n    dateOnly(old.close_date) !== dateOnly(r.close_date)\n  ) {\n    results.push({ json: { ...r, _route: \"update\", unit_category: old.unit_category } });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        16
+      ],
+      "id": "bb8e5e43-fd77-4738-ab78-0f9386f2940c",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00dc194a-2514-4960-b6af-7a987da00b5a",
+              "leftValue": "={{ $json._route }}",
+              "rightValue": "new",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        256
+      ],
+      "id": "1374461f-a1ba-48e4-84cf-e4bd8b7c81a2",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT project_code, approve_amount, received_amount, \n       spent_amount, close_date, unit_category\nFROM projects",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        736,
+        16
+      ],
+      "id": "9eead3de-8095-4a41-abe9-efe351480485",
+      "name": "Fetch Existing Projects",
+      "credentials": {
+        "postgres": {
+          "id": "YrZYCBMuJXc0NucT",
+          "name": "local host"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        304,
+        304
+      ],
+      "id": "d466e030-54e5-42c4-a23a-65c9328557ef",
+      "name": "Parse Uploaded File1"
+    },
+    {
+      "parameters": {
+        "formTitle": "上傳資料進資料庫",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "data",
+              "fieldType": "file",
+              "acceptFileTypes": ".xlsx"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        32,
+        304
+      ],
+      "id": "9bd1a193-5e74-4271-bf5f-183b213b0b33",
+      "name": "Start Import Process1",
+      "webhookId": "9aaeb983-46b2-42f2-9be8-c64ccd146ab9"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Build Funding Classification Prompt": {
+      "main": [
+        [
+          {
+            "node": "LLM Classify Funding Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Classify Funding Source": {
+      "main": [
+        [
+          {
+            "node": "Apply Funding Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Project Record": {
+      "main": [
+        [
+          {
+            "node": "Update College Mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Funding Classification": {
+      "main": [
+        [
+          {
+            "node": "Upsert Project Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Microsoft SQL": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Fetch Existing Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Microsoft SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Build Funding Classification Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Upsert Project Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Existing Projects": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Import Process1": {
+      "main": [
+        [
+          {
+            "node": "Parse Uploaded File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Uploaded File1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6dbae2c2-cb5c-42c2-9260-619efee30697",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2e624de9bf8a8e3cc24f9a2382f8b1b80ef27f84f24fbc4870dbfd51ba6ad9a7"
+  },
+  "id": "ffaS8uBmeK1v1hz4",
+  "tags": []
+}
