@@ -23,7 +23,6 @@ MONEY_FIELDS = {
     "executing_total_approved_amount",
     "approve_amount",
     "received_amount",
-    "spent_amount",
     "refund_amount_raw",
     "manage_fee",
 }
@@ -139,10 +138,9 @@ def upload():
         "close_date": "實結日期",
         "approve_amount": "計畫核定金額",
         "received_amount": "實收數",
-        "spent_amount": "實支數",
         "refund_amount_raw": "餘額繳回",
         "manage_fee": "管理費",
-        "college_name": "學院",
+        "college_category": "學院",
         "approve_year": "核定年度",
         "duration_days": "計畫期間天數",
         "project_count": "計畫件數",
@@ -199,7 +197,7 @@ def download_csv():
 
     resp = make_response("\ufeff" + csv_text)  # UTF-8-SIG
     resp.headers["Content-Type"] = "text/csv; charset=utf-8"
-    resp.headers["Content-Disposition"] = "attachment; filename=school.csv"
+    resp.headers["Content-Disposition"] = "attachment; filename=merged.csv"
     return resp
 
 
